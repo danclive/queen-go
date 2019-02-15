@@ -10,16 +10,16 @@ import (
 	nson "github.com/danclive/nson-go"
 )
 
-func InitConnect(event_emiter *EventEmiter) {
-	event_emiter.On(LINK, link)
-	event_emiter.On(UNLINK, unlink)
-	event_emiter.On(REMOVE, remove)
-	event_emiter.On(HAND, hand)
-	event_emiter.On(HANDED, handed)
-	event_emiter.On(ATTACH, attach)
-	event_emiter.On(DETACH, detach)
-	event_emiter.On(SEND, send)
-	event_emiter.On(RECV, recv)
+func InitConnect(queen *Queen) {
+	queen.On(LINK, link)
+	queen.On(UNLINK, unlink)
+	queen.On(REMOVE, remove)
+	queen.On(HAND, hand)
+	queen.On(HANDED, handed)
+	queen.On(ATTACH, attach)
+	queen.On(DETACH, detach)
+	queen.On(SEND, send)
+	queen.On(RECV, recv)
 }
 
 const (
@@ -56,7 +56,7 @@ func link(context Context) {
 		msg.Insert("ok", nson.Bool(false))
 		msg.Insert("error", nson.String("Message format error: can't not get protocol!"))
 
-		context.Event_emiter.Emit(LINK, msg)
+		context.Queen.Emit(LINK, msg)
 		return
 	}
 
@@ -66,7 +66,7 @@ func link(context Context) {
 			msg.Insert("ok", nson.Bool(false))
 			msg.Insert("error", nson.String("Message format error: can't not get addr!"))
 
-			context.Event_emiter.Emit(LINK, msg)
+			context.Queen.Emit(LINK, msg)
 			return
 		}
 
@@ -110,7 +110,7 @@ func link(context Context) {
 						"error":    nson.String(err.Error()),
 					}
 
-					context.Event_emiter.Emit(REMOVE, msg)
+					context.Queen.Emit(REMOVE, msg)
 					return
 				}
 
@@ -128,7 +128,7 @@ func link(context Context) {
 						"error":    nson.String(err.Error()),
 					}
 
-					context.Event_emiter.Emit(REMOVE, msg)
+					context.Queen.Emit(REMOVE, msg)
 					return
 				}
 
@@ -153,11 +153,11 @@ func link(context Context) {
 								"error":    nson.String("Message format error!"),
 							}
 
-							context.Event_emiter.Emit(REMOVE, msg)
+							context.Queen.Emit(REMOVE, msg)
 							return
 						}
 
-						context.Event_emiter.Emit(RECV, message)
+						context.Queen.Emit(RECV, message)
 					} else {
 						break
 					}
@@ -172,7 +172,7 @@ func link(context Context) {
 	msg.Insert("ok", nson.Bool(false))
 	msg.Insert("error", nson.String("unimplemented!"))
 
-	context.Event_emiter.Emit(LINK, msg)
+	context.Queen.Emit(LINK, msg)
 }
 
 func unlink(context Context) {
@@ -237,12 +237,12 @@ func send(context Context) {
 			"error":    nson.String(err.Error()),
 		}
 
-		context.Event_emiter.Emit(REMOVE, msg)
+		context.Queen.Emit(REMOVE, msg)
 		return
 	}
 
 	msg.Insert("ok", nson.Bool(true))
-	context.Event_emiter.Emit(SEND, msg)
+	context.Queen.Emit(SEND, msg)
 }
 
 func recv(context Context) {

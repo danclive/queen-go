@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-type EventEmiter struct {
+type Queen struct {
 	handles map[string][]Handler // HashMap<String, []Handler>
 	next_id int32
 	lock    sync.RWMutex
@@ -17,25 +17,25 @@ type Handler struct {
 }
 
 type Context struct {
-	Event_emiter *EventEmiter
-	Id           int32
-	Event        string
-	Message      interface{}
+	Queen   *Queen
+	Id      int32
+	Event   string
+	Message interface{}
 }
 
-func NewEventEmiter() EventEmiter {
-	return EventEmiter{
+func NewQueen() Queen {
+	return Queen{
 		handles: make(map[string][]Handler),
 		next_id: 0,
 	}
 }
 
-func (self *EventEmiter) InitEventEmiter() {
+func (self *Queen) InitQueen() {
 	self.handles = make(map[string][]Handler)
 	self.next_id = 0
 }
 
-func (self *EventEmiter) On(event string, fn func(Context)) (id int32) {
+func (self *Queen) On(event string, fn func(Context)) (id int32) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
 
@@ -61,7 +61,7 @@ func (self *EventEmiter) On(event string, fn func(Context)) (id int32) {
 	return
 }
 
-func (self *EventEmiter) Off(id int32) (ok bool) {
+func (self *Queen) Off(id int32) (ok bool) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
 
@@ -94,19 +94,19 @@ func (self *EventEmiter) Off(id int32) (ok bool) {
 	return
 }
 
-func (self *EventEmiter) Emit(event string, message interface{}) {
+func (self *Queen) Emit(event string, message interface{}) {
 	self.lock.RLock()
 	handlers, ok := self.handles[event]
 	self.lock.RUnlock()
 
 	if ok {
-		go func(event_emiter *EventEmiter, handlers []Handler) {
+		go func(queen *Queen, handlers []Handler) {
 			for _, handler := range handlers {
 				context := Context{
-					Event_emiter: event_emiter,
-					Id:           handler.id,
-					Event:        event,
-					Message:      message,
+					Queen:   queen,
+					Id:      handler.id,
+					Event:   event,
+					Message: message,
 				}
 				handler.handle(context)
 			}

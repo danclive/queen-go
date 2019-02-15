@@ -1,18 +1,22 @@
 package main
 
 import (
-	queen "github.com/danclive/queen-go"
+	"fmt"
+
+	"github.com/danclive/nson-go"
+
+	"github.com/danclive/queen-go"
 )
 
 func main() {
-	event_emiter := queen.NewEventEmiter()
+	center := queen.NewCenter()
 
-	event_emiter.On("run", func(context queen.Context) {
-		// fmt.Println(1)
-		event_emiter.Emit("run", nil)
+	center.On("hello", func(context queen.CContext) {
+		fmt.Println(context)
 	})
 
-	event_emiter.Emit("run", nil)
+	center.Insert("hello", nson.String("world"))
+	center.Insert("hello", nson.String("world2"))
 
 	select {}
 }

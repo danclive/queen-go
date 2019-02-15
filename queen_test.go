@@ -6,128 +6,128 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewEventEmiter(t *testing.T) {
-	event_emiter := NewEventEmiter()
-	assert.NotNil(t, event_emiter.handles)
+func TestNewQueen(t *testing.T) {
+	queen := NewQueen()
+	assert.NotNil(t, queen.handles)
 }
 
-func TestInitEventEmiter(t *testing.T) {
-	event_emiter := EventEmiter{}
-	event_emiter.InitEventEmiter()
-	assert.NotNil(t, event_emiter.handles)
+func TestInitQueen(t *testing.T) {
+	queen := Queen{}
+	queen.InitQueen()
+	assert.NotNil(t, queen.handles)
 }
 
 func TestOn(t *testing.T) {
-	event_emiter := NewEventEmiter()
+	queen := NewQueen()
 
-	event_emiter.On("hello", func(context Context) {})
+	queen.On("hello", func(context Context) {})
 
-	handles, ok := event_emiter.handles["hello"]
+	handles, ok := queen.handles["hello"]
 	assert.True(t, ok)
 	assert.Exactly(t, 1, len(handles))
-	assert.Exactly(t, 1, len(event_emiter.handles))
+	assert.Exactly(t, 1, len(queen.handles))
 
-	event_emiter.On("hello", func(context Context) {})
-	handles, ok = event_emiter.handles["hello"]
+	queen.On("hello", func(context Context) {})
+	handles, ok = queen.handles["hello"]
 	assert.True(t, ok)
 	assert.Exactly(t, 2, len(handles))
-	assert.Exactly(t, 1, len(event_emiter.handles))
+	assert.Exactly(t, 1, len(queen.handles))
 
-	_, ok = event_emiter.handles["unkonw"]
+	_, ok = queen.handles["unkonw"]
 	assert.False(t, ok)
 }
 
 func TestOff(t *testing.T) {
-	event_emiter := NewEventEmiter()
+	queen := NewQueen()
 
-	id := event_emiter.On("hello", func(context Context) {})
+	id := queen.On("hello", func(context Context) {})
 
-	handles, ok := event_emiter.handles["hello"]
+	handles, ok := queen.handles["hello"]
 	assert.True(t, ok)
 	assert.Exactly(t, 1, len(handles))
-	assert.Exactly(t, 1, len(event_emiter.handles))
+	assert.Exactly(t, 1, len(queen.handles))
 
-	has := event_emiter.Off(id)
+	has := queen.Off(id)
 	assert.True(t, has)
 
-	handles, ok = event_emiter.handles["hello"]
+	handles, ok = queen.handles["hello"]
 	assert.False(t, ok)
 	assert.Exactly(t, 0, len(handles))
-	assert.Exactly(t, 0, len(event_emiter.handles))
+	assert.Exactly(t, 0, len(queen.handles))
 }
 
 func TestOff2(t *testing.T) {
-	event_emiter := NewEventEmiter()
+	queen := NewQueen()
 
-	id1 := event_emiter.On("hello", func(context Context) {})
-	id2 := event_emiter.On("hello", func(context Context) {})
+	id1 := queen.On("hello", func(context Context) {})
+	id2 := queen.On("hello", func(context Context) {})
 
-	handles, ok := event_emiter.handles["hello"]
+	handles, ok := queen.handles["hello"]
 	assert.True(t, ok)
 	assert.Exactly(t, 2, len(handles))
-	assert.Exactly(t, 1, len(event_emiter.handles))
+	assert.Exactly(t, 1, len(queen.handles))
 
-	has := event_emiter.Off(id1)
+	has := queen.Off(id1)
 	assert.True(t, has)
 	_ = id2
 
-	handles, ok = event_emiter.handles["hello"]
+	handles, ok = queen.handles["hello"]
 	assert.True(t, ok)
 	assert.Exactly(t, 1, len(handles))
-	assert.Exactly(t, 1, len(event_emiter.handles))
+	assert.Exactly(t, 1, len(queen.handles))
 }
 
 func TestOff3(t *testing.T) {
-	event_emiter := NewEventEmiter()
-	has := event_emiter.Off(123)
+	queen := NewQueen()
+	has := queen.Off(123)
 	assert.False(t, has)
 }
 
 func TestEmit(t *testing.T) {
-	event_emiter := NewEventEmiter()
+	queen := NewQueen()
 
 	counter := 0
 	ch := make(chan int)
 
-	event_emiter.On("hello", func(context Context) {
+	queen.On("hello", func(context Context) {
 		counter += context.Message.(int)
 		ch <- 1
 	})
 
-	event_emiter.Emit("hello", 1)
+	queen.Emit("hello", 1)
 	<-ch
 
 	assert.Exactly(t, 1, counter)
 
-	event_emiter.Emit("unknow", 1)
+	queen.Emit("unknow", 1)
 	assert.Exactly(t, 1, counter)
 
-	event_emiter.Emit("hello", 2)
+	queen.Emit("hello", 2)
 	<-ch
 
 	assert.Exactly(t, 3, counter)
 }
 
 func TestEmit2(t *testing.T) {
-	event_emiter := NewEventEmiter()
+	queen := NewQueen()
 
 	counter := 0
 	ch := make(chan int)
 
-	event_emiter.On("hello", func(context Context) {
+	queen.On("hello", func(context Context) {
 		counter += context.Message.(int)
 		ch <- 1
 	})
 
-	event_emiter.Emit("hello", 1)
+	queen.Emit("hello", 1)
 	<-ch
 
 	assert.Exactly(t, 1, counter)
 
-	event_emiter.Emit("unknow", 1)
+	queen.Emit("unknow", 1)
 	assert.Exactly(t, 1, counter)
 
-	event_emiter.Emit("hello", 2)
+	queen.Emit("hello", 2)
 	<-ch
 
 	assert.Exactly(t, 3, counter)
