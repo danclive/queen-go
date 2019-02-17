@@ -119,16 +119,23 @@ func TestEmit2(t *testing.T) {
 		ch <- 1
 	})
 
+	queen.On("hello", func(context Context) {
+		counter += context.Message.(int)
+		ch <- 1
+	})
+
 	queen.Emit("hello", 1)
 	<-ch
+	<-ch
 
-	assert.Exactly(t, 1, counter)
+	assert.Exactly(t, 2, counter)
 
 	queen.Emit("unknow", 1)
-	assert.Exactly(t, 1, counter)
+	assert.Exactly(t, 2, counter)
 
 	queen.Emit("hello", 2)
 	<-ch
+	<-ch
 
-	assert.Exactly(t, 3, counter)
+	assert.Exactly(t, 6, counter)
 }

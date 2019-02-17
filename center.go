@@ -10,6 +10,7 @@ import (
 type Center struct {
 	maps    map[string]nson.Value
 	handles map[string][]CHandler
+	all     []CHandler
 	next_id int32
 	lock    sync.RWMutex
 }
@@ -31,6 +32,7 @@ func NewCenter() Center {
 	return Center{
 		maps:    make(map[string]nson.Value),
 		handles: make(map[string][]CHandler),
+		all:     make([]CHandler, 0),
 		next_id: 0,
 	}
 }
@@ -38,6 +40,7 @@ func NewCenter() Center {
 func (self *Center) InitCenter() {
 	self.maps = make(map[string]nson.Value)
 	self.handles = make(map[string][]CHandler)
+	self.all = make([]CHandler, 0)
 	self.next_id = 0
 }
 
@@ -67,6 +70,27 @@ func (self *Center) On(key string, fn func(CContext)) (id int32) {
 	return
 }
 
+func (self *Center) All(fn func(CContext)) (id int32) {
+	self.lock.Lock()
+	defer self.lock.Unlock()
+
+	if self.next_id == math.MaxInt32 {
+		self.next_id = 0
+	}
+
+	self.next_id += 1
+	id = self.next_id
+
+	handler := CHandler{
+		id:     id,
+		handle: fn,
+	}
+
+	self.all = append(self.all, handler)
+
+	return
+}
+
 func (self *Center) Off(id int32) (ok bool) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
@@ -89,11 +113,22 @@ func (self *Center) Off(id int32) (ok bool) {
 			l := len(handles)
 
 			if l > 1 {
-				handles = append(handles[:pos], handles[pos+1:]...)
+				handles := append(handles[:pos], handles[pos+1:]...)
 				self.handles[event] = handles
 			} else {
 				delete(self.handles, event)
 			}
+
+			return
+		}
+	}
+
+	for i, handler := range self.all {
+		if handler.id == id {
+			self.all = append(self.all[:i], self.all[i+1:]...)
+			ok = true
+
+			return
 		}
 	}
 
@@ -106,10 +141,26 @@ func (self *Center) Insert(key string, value nson.Value) {
 	v, has := self.maps[key]
 	self.maps[key] = value
 	handlers, ok := self.handles[key]
+	all := self.all
 
 	self.lock.Unlock()
 
-	if (!has || v != value) && ok {
+	if (!has || v != value) && len(all) > 0 {
+		go func(center *Center, handlers []CHandler) {
+			for _, handler := range handlers {
+				context := CContext{
+					Center:   center,
+					Id:       handler.id,
+					Key:      key,
+					OldValue: v,
+					Value:    value,
+				}
+				handler.handle(context)
+			}
+		}(self, all)
+	}
+
+	if (!has || v != value) && ok && len(handlers) > 0 {
 		go func(center *Center, handlers []CHandler) {
 			for _, handler := range handlers {
 				context := CContext{
