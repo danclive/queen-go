@@ -35,10 +35,11 @@ const (
 )
 
 var control struct {
-	lock   sync.Mutex
-	islink bool
-	conn   net.Conn
-	addr   string
+	lock      sync.Mutex
+	islink    bool
+	handshake bool
+	conn      net.Conn
+	addr      string
 }
 
 func link(context Context) {
@@ -99,9 +100,10 @@ func link(context Context) {
 
 				err := conn.SetReadDeadline(t.Add(10 * time.Second))
 				if err != nil {
-					control.lock.Lock()
-					control.islink = false
-					control.lock.Unlock()
+					// control.lock.Lock()
+					// control.islink = false
+					// control.handshake = false
+					// control.lock.Unlock()
 
 					msg := nson.Message{
 						"event":    nson.String(REMOVE),
@@ -117,9 +119,10 @@ func link(context Context) {
 				buf := make([]byte, 0, 4*1024)
 				n, err := control.conn.Read(buf)
 				if err != nil {
-					control.lock.Lock()
-					control.islink = false
-					control.lock.Unlock()
+					// control.lock.Lock()
+					// control.islink = false
+					// control.handshake = false
+					// control.lock.Unlock()
 
 					msg := nson.Message{
 						"event":    nson.String(REMOVE),
@@ -142,15 +145,16 @@ func link(context Context) {
 						message, err := nson.Message{}.Decode(buffer)
 						if err != nil {
 
-							control.lock.Lock()
-							control.islink = false
-							control.lock.Unlock()
+							// control.lock.Lock()
+							// control.islink = false
+							// control.handshake = false
+							// control.lock.Unlock()
 
 							msg := nson.Message{
 								"event":    nson.String(REMOVE),
 								"protocol": nson.String("tcp"),
 								"addr":     nson.String(control.addr),
-								"error":    nson.String("Message format error!"),
+								"error":    nson.String("Message decode error!"),
 							}
 
 							context.Queen.Emit(REMOVE, msg)
@@ -176,11 +180,43 @@ func link(context Context) {
 }
 
 func unlink(context Context) {
+	msg, ok := context.Message.(nson.Message)
+	if !ok {
+		return
+	}
 
+	if msg.Contains("ok") {
+		return
+	}
+
+	control.lock.Lock()
+
+	if control.islink {
+		control.islink = false
+		control.handshake = false
+		control.conn.Close()
+
+		msg.Insert("ok", nson.Bool(true))
+		msg.Insert("protocol", nson.String("tcp"))
+		msg.Insert("addr", nson.String(control.addr))
+	} else {
+		msg.Insert("ok", nson.Bool(false))
+		msg.Insert("error", nson.String("Already unlink!"))
+	}
+
+	control.lock.Unlock()
 }
 
 func remove(context Context) {
+	control.lock.Lock()
 
+	if control.islink {
+		control.islink = false
+		control.handshake = false
+		control.conn.Close()
+	}
+
+	control.lock.Unlock()
 }
 
 func hand(context Context) {
@@ -222,11 +258,18 @@ func send(context Context) {
 		return
 	}
 
-	if !strings.HasPrefix(event, "sys:") {
+	if !strings.HasPrefix(event, "pub:") {
 		return
 	}
 
 	buf := new(bytes.Buffer)
+
+	err = msg.Encode(buf)
+	if err != nil {
+		msg.Insert("ok", nson.Bool(true))
+		msg.Insert("error", nson.String("Message encode error!"))
+		return
+	}
 
 	_, err = control.conn.Write(buf.Bytes())
 	if err != nil {

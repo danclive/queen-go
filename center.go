@@ -135,7 +135,7 @@ func (self *Center) Off(id int32) (ok bool) {
 	return
 }
 
-func (self *Center) Insert(key string, value nson.Value) {
+func (self *Center) Insert(key string, value nson.Value) (nson.Value, bool) {
 	self.lock.Lock()
 
 	v, has := self.maps[key]
@@ -174,6 +174,17 @@ func (self *Center) Insert(key string, value nson.Value) {
 			}
 		}(self, handlers)
 	}
+
+	return v, has
+}
+
+func (self *Center) Set(key string, value nson.Value) (nson.Value, bool) {
+	self.lock.RLock()
+	defer self.lock.RUnlock()
+
+	v, has := self.maps[key]
+	self.maps[key] = value
+	return v, has
 }
 
 func (self *Center) Get(key string) (nson.Value, bool) {

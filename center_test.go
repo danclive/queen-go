@@ -125,9 +125,11 @@ func TestCenterInsert(t *testing.T) {
 		ch <- 1
 	})
 
-	center.Insert("hello", nson.I32(1))
+	value, has := center.Insert("hello", nson.I32(1))
 	<-ch
 
+	assert.Exactly(t, nil, value)
+	assert.Exactly(t, false, has)
 	assert.Exactly(t, 1, counter)
 }
 
@@ -165,10 +167,14 @@ func TestCenterInsert3(t *testing.T) {
 		ch <- 1
 	})
 
-	center.Insert("hello", nson.I32(1))
-	center.Insert("hello", nson.I32(1))
+	value, has := center.Insert("hello", nson.I32(1))
+	value2, has2 := center.Insert("hello", nson.I32(1))
 	<-ch
 
+	assert.Exactly(t, nil, value)
+	assert.Exactly(t, false, has)
+	assert.Exactly(t, nson.I32(1), value2)
+	assert.Exactly(t, true, has2)
 	assert.Exactly(t, 1, counter)
 }
 
@@ -279,4 +285,17 @@ func TestCenterRemove(t *testing.T) {
 
 	_, has = center.Get("hello")
 	assert.Exactly(t, false, has)
+}
+
+func TestCenterSet(t *testing.T) {
+	center := NewCenter()
+
+	value, has := center.Set("hello", nson.I32(123))
+
+	assert.Exactly(t, nil, value)
+	assert.Exactly(t, false, has)
+
+	value2, has2 := center.Get("hello")
+	assert.Exactly(t, true, has2)
+	assert.Exactly(t, nson.I32(123), value2.(nson.I32))
 }
