@@ -43,10 +43,7 @@ var control struct {
 }
 
 func link(context Context) {
-	msg, ok := context.Message.(nson.Message)
-	if !ok {
-		return
-	}
+	msg := context.Message
 
 	if msg.Contains("ok") {
 		return
@@ -161,7 +158,7 @@ func link(context Context) {
 							return
 						}
 
-						context.Queen.Emit(RECV, message)
+						context.Queen.Emit(RECV, message.(nson.Message))
 					} else {
 						break
 					}
@@ -180,10 +177,7 @@ func link(context Context) {
 }
 
 func unlink(context Context) {
-	msg, ok := context.Message.(nson.Message)
-	if !ok {
-		return
-	}
+	msg := context.Message
 
 	if msg.Contains("ok") {
 		return
@@ -244,10 +238,7 @@ func send(context Context) {
 		return
 	}
 
-	msg, ok := context.Message.(nson.Message)
-	if !ok {
-		return
-	}
+	msg := context.Message
 
 	if msg.Contains("ok") {
 		return

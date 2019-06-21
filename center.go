@@ -3,11 +3,13 @@ package queen
 import (
 	"math"
 	"sync"
+	"time"
 
 	"github.com/danclive/nson-go"
 )
 
 type Center struct {
+	id      int32
 	maps    map[string]nson.Value
 	handles map[string][]CHandler
 	all     []CHandler
@@ -28,8 +30,9 @@ type CContext struct {
 	Value    nson.Value
 }
 
-func NewCenter() Center {
-	return Center{
+func NewCenter() *Center {
+	return &Center{
+		id:      int32(time.Now().Nanosecond()),
 		maps:    make(map[string]nson.Value),
 		handles: make(map[string][]CHandler),
 		all:     make([]CHandler, 0),
@@ -38,10 +41,48 @@ func NewCenter() Center {
 }
 
 func (self *Center) InitCenter() {
+	self.id = int32(time.Now().Nanosecond())
 	self.maps = make(map[string]nson.Value)
 	self.handles = make(map[string][]CHandler)
 	self.all = make([]CHandler, 0)
 	self.next_id = 0
+}
+
+func (self *Center) Run(queen *Queen, event string) {
+	self.All(func(ctx CContext) {
+		msg := nson.Message{
+			"key":   nson.String(ctx.Key),
+			"value": ctx.Value,
+			"_id":   nson.I32(self.id),
+		}
+
+		if ctx.OldValue != nil {
+			msg.Insert("old_value", ctx.OldValue)
+		}
+
+		queen.Emit(event, msg)
+	})
+
+	go queen.On(event, func(ctx Context) {
+		key, err := ctx.Message.GetString("key")
+		if err != nil {
+			return
+		}
+
+		value, has := ctx.Message.Get("value")
+		if !has {
+			return
+		}
+
+		id, err := ctx.Message.GetI32("_id")
+		if err != nil {
+			return
+		}
+
+		if id != self.id {
+			self.InsertSkipAll(key, value)
+		}
+	})
 }
 
 func (self *Center) On(key string, fn func(CContext)) (id int32) {
@@ -136,6 +177,14 @@ func (self *Center) Off(id int32) (ok bool) {
 }
 
 func (self *Center) Insert(key string, value nson.Value) (nson.Value, bool) {
+	return self.insert(key, value, false)
+}
+
+func (self *Center) InsertSkipAll(key string, value nson.Value) (nson.Value, bool) {
+	return self.insert(key, value, true)
+}
+
+func (self *Center) insert(key string, value nson.Value, skip_all bool) (nson.Value, bool) {
 	self.lock.Lock()
 
 	v, has := self.maps[key]
@@ -145,7 +194,7 @@ func (self *Center) Insert(key string, value nson.Value) (nson.Value, bool) {
 
 	self.lock.Unlock()
 
-	if (!has || v != value) && len(all) > 0 {
+	if !skip_all && len(all) > 0 {
 		go func(center *Center, handlers []CHandler) {
 			for _, handler := range handlers {
 				context := CContext{

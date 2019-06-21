@@ -3,6 +3,8 @@ package queen
 import (
 	"testing"
 
+	"github.com/danclive/nson-go"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -90,19 +92,20 @@ func TestEmit(t *testing.T) {
 	ch := make(chan int)
 
 	queen.On("hello", func(context Context) {
-		counter += context.Message.(int)
+		t, _ := context.Message.GetI32("counter")
+		counter += int(t)
 		ch <- 1
 	})
 
-	queen.Emit("hello", 1)
+	queen.Emit("hello", nson.Message{"counter": nson.I32(1)})
 	<-ch
 
 	assert.Exactly(t, 1, counter)
 
-	queen.Emit("unknow", 1)
+	queen.Emit("unknow", nson.Message{"counter": nson.I32(1)})
 	assert.Exactly(t, 1, counter)
 
-	queen.Emit("hello", 2)
+	queen.Emit("hello", nson.Message{"counter": nson.I32(2)})
 	<-ch
 
 	assert.Exactly(t, 3, counter)
@@ -115,25 +118,27 @@ func TestEmit2(t *testing.T) {
 	ch := make(chan int)
 
 	queen.On("hello", func(context Context) {
-		counter += context.Message.(int)
+		t, _ := context.Message.GetI32("counter")
+		counter += int(t)
 		ch <- 1
 	})
 
 	queen.On("hello", func(context Context) {
-		counter += context.Message.(int)
+		t, _ := context.Message.GetI32("counter")
+		counter += int(t)
 		ch <- 1
 	})
 
-	queen.Emit("hello", 1)
+	queen.Emit("hello", nson.Message{"counter": nson.I32(1)})
 	<-ch
 	<-ch
 
 	assert.Exactly(t, 2, counter)
 
-	queen.Emit("unknow", 1)
+	queen.Emit("unknow", nson.Message{"counter": nson.I32(1)})
 	assert.Exactly(t, 2, counter)
 
-	queen.Emit("hello", 2)
+	queen.Emit("hello", nson.Message{"counter": nson.I32(2)})
 	<-ch
 	<-ch
 
