@@ -10,43 +10,43 @@ import (
 	"github.com/danclive/nson-go"
 )
 
-type Queen struct {
-	handles map[string][]Handler // HashMap<String, []Handler>
+type EventBus struct {
+	handles map[string][]EventBusHandler // HashMap<String, []Handler>
 	next_id int32
 	lock    sync.RWMutex
 	timer   *Timer
 }
 
-type Handler struct {
+type EventBusHandler struct {
 	id     int32
-	handle func(Context)
+	handle func(EventBusContext)
 }
 
-type Context struct {
-	Queen   *Queen
-	Id      int32
-	Event   string
-	Message nson.Message
+type EventBusContext struct {
+	EventBus *EventBus
+	Id       int32
+	Event    string
+	Message  nson.Message
 }
 
-func NewQueen() *Queen {
-	queen := &Queen{
-		handles: make(map[string][]Handler),
+func NewEventBus() *EventBus {
+	eventBus := &EventBus{
+		handles: make(map[string][]EventBusHandler),
 		next_id: 0,
 		timer:   NewTimer(),
 	}
 
-	queen.timer.Run(queen)
+	eventBus.timer.Run(eventBus)
 
-	return queen
+	return eventBus
 }
 
-func (self *Queen) InitQueen() {
-	self.handles = make(map[string][]Handler)
+func (self *EventBus) InitEventBus() {
+	self.handles = make(map[string][]EventBusHandler)
 	self.next_id = 0
 }
 
-func (self *Queen) On(event string, fn func(Context)) (id int32) {
+func (self *EventBus) On(event string, fn func(EventBusContext)) (id int32) {
 	self.lock.Lock()
 
 	if self.next_id == math.MaxInt32 {
@@ -56,7 +56,7 @@ func (self *Queen) On(event string, fn func(Context)) (id int32) {
 	self.next_id += 1
 	id = self.next_id
 
-	handler := Handler{
+	handler := EventBusHandler{
 		id:     id,
 		handle: fn,
 	}
@@ -65,7 +65,7 @@ func (self *Queen) On(event string, fn func(Context)) (id int32) {
 		handlers = append(handlers, handler)
 		self.handles[event] = handlers
 	} else {
-		self.handles[event] = []Handler{handler}
+		self.handles[event] = []EventBusHandler{handler}
 	}
 
 	self.lock.Unlock()
@@ -80,7 +80,7 @@ func (self *Queen) On(event string, fn func(Context)) (id int32) {
 	return
 }
 
-func (self *Queen) Off(id int32) (ok bool) {
+func (self *EventBus) Off(id int32) (ok bool) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
 
@@ -120,7 +120,7 @@ func (self *Queen) Off(id int32) (ok bool) {
 	return
 }
 
-func (self *Queen) Emit(event string, message nson.Message) {
+func (self *EventBus) Emit(event string, message nson.Message) {
 	if message.Contains("_delay") {
 		delay, err := message.GetI32("_delay")
 		if err != nil {
@@ -150,19 +150,19 @@ func (self *Queen) Emit(event string, message nson.Message) {
 	}
 }
 
-func (self *Queen) Push(event string, message nson.Message) {
+func (self *EventBus) Push(event string, message nson.Message) {
 	self.lock.RLock()
 	handlers, ok := self.handles[event]
 	self.lock.RUnlock()
 
 	if ok {
-		go func(queen *Queen, handlers []Handler) {
+		go func(eventBus *EventBus, handlers []EventBusHandler) {
 			for _, handler := range handlers {
-				context := Context{
-					Queen:   queen,
-					Id:      handler.id,
-					Event:   event,
-					Message: message,
+				context := EventBusContext{
+					EventBus: eventBus,
+					Id:       handler.id,
+					Event:    event,
+					Message:  message,
 				}
 				handler.handle(context)
 			}
@@ -215,8 +215,8 @@ func (t *Timer) Pop() interface{} {
 	return heap.Pop((*t).tasks)
 }
 
-func (t *Timer) Run(queen *Queen) {
-	go func(timer *Timer, queen *Queen) {
+func (t *Timer) Run(queen *EventBus) {
+	go func(timer *Timer, queen *EventBus) {
 		for timer.run {
 			sleep_duration := time.Second * 1
 

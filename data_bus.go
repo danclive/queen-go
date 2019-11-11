@@ -8,48 +8,48 @@ import (
 	"github.com/danclive/nson-go"
 )
 
-type Center struct {
+type DataBus struct {
 	id      int32
 	maps    map[string]nson.Value
-	handles map[string][]CHandler
-	all     []CHandler
+	handles map[string][]DataBusHandler
+	all     []DataBusHandler
 	next_id int32
 	lock    sync.RWMutex
 }
 
-type CHandler struct {
+type DataBusHandler struct {
 	id     int32
-	handle func(CContext)
+	handle func(DataBusContext)
 }
 
-type CContext struct {
-	Center   *Center
+type DataBusContext struct {
+	DataBus  *DataBus
 	Id       int32
 	Key      string
 	OldValue nson.Value
 	Value    nson.Value
 }
 
-func NewCenter() *Center {
-	return &Center{
+func NewDataBus() *DataBus {
+	return &DataBus{
 		id:      int32(time.Now().Nanosecond()),
 		maps:    make(map[string]nson.Value),
-		handles: make(map[string][]CHandler),
-		all:     make([]CHandler, 0),
+		handles: make(map[string][]DataBusHandler),
+		all:     make([]DataBusHandler, 0),
 		next_id: 0,
 	}
 }
 
-func (self *Center) InitCenter() {
+func (self *DataBus) InitDataBus() {
 	self.id = int32(time.Now().Nanosecond())
 	self.maps = make(map[string]nson.Value)
-	self.handles = make(map[string][]CHandler)
-	self.all = make([]CHandler, 0)
+	self.handles = make(map[string][]DataBusHandler)
+	self.all = make([]DataBusHandler, 0)
 	self.next_id = 0
 }
 
-func (self *Center) Run(queen *Queen, event string) {
-	self.All(func(ctx CContext) {
+func (self *DataBus) Run(eventBus *EventBus, event string) {
+	self.All(func(ctx DataBusContext) {
 		msg := nson.Message{
 			"key":   nson.String(ctx.Key),
 			"value": ctx.Value,
@@ -60,10 +60,10 @@ func (self *Center) Run(queen *Queen, event string) {
 			msg.Insert("old_value", ctx.OldValue)
 		}
 
-		queen.Emit(event, msg)
+		eventBus.Emit(event, msg)
 	})
 
-	go queen.On(event, func(ctx Context) {
+	go eventBus.On(event, func(ctx EventBusContext) {
 		key, err := ctx.Message.GetString("key")
 		if err != nil {
 			return
@@ -85,7 +85,7 @@ func (self *Center) Run(queen *Queen, event string) {
 	})
 }
 
-func (self *Center) On(key string, fn func(CContext)) (id int32) {
+func (self *DataBus) On(key string, fn func(DataBusContext)) (id int32) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
 
@@ -96,7 +96,7 @@ func (self *Center) On(key string, fn func(CContext)) (id int32) {
 	self.next_id += 1
 	id = self.next_id
 
-	handler := CHandler{
+	handler := DataBusHandler{
 		id:     id,
 		handle: fn,
 	}
@@ -105,13 +105,13 @@ func (self *Center) On(key string, fn func(CContext)) (id int32) {
 		handlers = append(handlers, handler)
 		self.handles[key] = handlers
 	} else {
-		self.handles[key] = []CHandler{handler}
+		self.handles[key] = []DataBusHandler{handler}
 	}
 
 	return
 }
 
-func (self *Center) All(fn func(CContext)) (id int32) {
+func (self *DataBus) All(fn func(DataBusContext)) (id int32) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
 
@@ -122,7 +122,7 @@ func (self *Center) All(fn func(CContext)) (id int32) {
 	self.next_id += 1
 	id = self.next_id
 
-	handler := CHandler{
+	handler := DataBusHandler{
 		id:     id,
 		handle: fn,
 	}
@@ -132,7 +132,7 @@ func (self *Center) All(fn func(CContext)) (id int32) {
 	return
 }
 
-func (self *Center) Off(id int32) (ok bool) {
+func (self *DataBus) Off(id int32) (ok bool) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
 
@@ -176,15 +176,15 @@ func (self *Center) Off(id int32) (ok bool) {
 	return
 }
 
-func (self *Center) Insert(key string, value nson.Value) (nson.Value, bool) {
+func (self *DataBus) Insert(key string, value nson.Value) (nson.Value, bool) {
 	return self.insert(key, value, false)
 }
 
-func (self *Center) InsertSkipAll(key string, value nson.Value) (nson.Value, bool) {
+func (self *DataBus) InsertSkipAll(key string, value nson.Value) (nson.Value, bool) {
 	return self.insert(key, value, true)
 }
 
-func (self *Center) insert(key string, value nson.Value, skip_all bool) (nson.Value, bool) {
+func (self *DataBus) insert(key string, value nson.Value, skip_all bool) (nson.Value, bool) {
 	self.lock.Lock()
 
 	v, has := self.maps[key]
@@ -195,10 +195,10 @@ func (self *Center) insert(key string, value nson.Value, skip_all bool) (nson.Va
 	self.lock.Unlock()
 
 	if !skip_all && len(all) > 0 {
-		go func(center *Center, handlers []CHandler) {
+		go func(dataBus *DataBus, handlers []DataBusHandler) {
 			for _, handler := range handlers {
-				context := CContext{
-					Center:   center,
+				context := DataBusContext{
+					DataBus:  dataBus,
 					Id:       handler.id,
 					Key:      key,
 					OldValue: v,
@@ -210,10 +210,10 @@ func (self *Center) insert(key string, value nson.Value, skip_all bool) (nson.Va
 	}
 
 	if (!has || v != value) && ok && len(handlers) > 0 {
-		go func(center *Center, handlers []CHandler) {
+		go func(dataBus *DataBus, handlers []DataBusHandler) {
 			for _, handler := range handlers {
-				context := CContext{
-					Center:   center,
+				context := DataBusContext{
+					DataBus:  dataBus,
 					Id:       handler.id,
 					Key:      key,
 					OldValue: v,
@@ -227,7 +227,7 @@ func (self *Center) insert(key string, value nson.Value, skip_all bool) (nson.Va
 	return v, has
 }
 
-func (self *Center) Set(key string, value nson.Value) (nson.Value, bool) {
+func (self *DataBus) Set(key string, value nson.Value) (nson.Value, bool) {
 	self.lock.RLock()
 	defer self.lock.RUnlock()
 
@@ -236,7 +236,7 @@ func (self *Center) Set(key string, value nson.Value) (nson.Value, bool) {
 	return v, has
 }
 
-func (self *Center) Get(key string) (nson.Value, bool) {
+func (self *DataBus) Get(key string) (nson.Value, bool) {
 	self.lock.RLock()
 	defer self.lock.RUnlock()
 
@@ -244,7 +244,7 @@ func (self *Center) Get(key string) (nson.Value, bool) {
 	return value, has
 }
 
-func (self *Center) Remove(key string) (nson.Value, bool) {
+func (self *DataBus) Remove(key string) (nson.Value, bool) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
 

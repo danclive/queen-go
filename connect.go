@@ -1,5 +1,6 @@
 package queen
 
+/*
 import (
 	"bytes"
 	"net"
@@ -10,7 +11,7 @@ import (
 	nson "github.com/danclive/nson-go"
 )
 
-func InitConnect(queen *Queen) {
+func InitConnect(queen *EventBus) {
 	queen.On(LINK, link)
 	queen.On(UNLINK, unlink)
 	queen.On(REMOVE, remove)
@@ -289,3 +290,4 @@ func GetI32(b []byte, pos int) int32 {
 		(int32(b[pos+2]) << 16) |
 		(int32(b[pos+3]) << 24)
 }
+*/

@@ -1,5 +1,6 @@
 package queen
 
+/*
 import (
 	"bytes"
 	"log"
@@ -9,7 +10,7 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
-func MqttRun(topic string, mqttClient mqtt.Client, queen *Queen) {
+func MqttRun(topic string, mqttClient mqtt.Client, queen *EventBus) {
 	mqttClient.Subscribe(topic, 1, func(client mqtt.Client, msg mqtt.Message) {
 		buf := bytes.NewBuffer(msg.Payload())
 		m, err := nson.Message{}.Decode(buf)
@@ -57,3 +58,4 @@ func MqttRun(topic string, mqttClient mqtt.Client, queen *Queen) {
 		mqttClient.Publish(topic, 1, false, buf.Bytes())
 	})
 }
+*/
