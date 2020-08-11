@@ -1,4 +1,4 @@
-package queen
+package bus
 
 import (
 	"testing"
