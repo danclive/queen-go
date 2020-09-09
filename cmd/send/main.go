@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/danclive/nson-go"
-
 	"github.com/danclive/queen-go/client"
 	"github.com/danclive/queen-go/conn"
 	"github.com/danclive/queen-go/crypto"
@@ -14,7 +13,7 @@ import (
 
 func main() {
 	config := conn.Config{
-		Addrs:        []string{"danclive.com:8888"},
+		Addrs:        []string{"snple.com:8888"},
 		EnableCrypto: true,
 		CryptoMethod: crypto.Aes128Gcm,
 		AccessKey:    "fcbd6ea1e8c94dfc6b84405e",
@@ -22,33 +21,28 @@ func main() {
 		Debug:        false,
 	}
 
-	client, err := client.NewClient(config)
+	c, err := client.NewClient(config)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	_ = client
+	// go func() {
+	// 	time.Sleep(10 * time.Second)
+	// 	client.Close()
+	// }()
 
-	err = client.Send("lala", nson.Message{"aaa": nson.String("bbb")}, nil, nil, time.Second*10)
-	log.Println(err)
-
-	msg, err := client.Call("lala", nson.Message{"aaa": nson.String("bbb")}, nil, nil, time.Second*10)
-	log.Println(err)
-	log.Println(msg)
-
+	_ = c
 	for {
-		now := time.Now()
-		msg, err := client.Call("ping", nson.Message{"aaa": nson.String("bbb")}, nil, nil, time.Second*10)
-		//log.Println(err)
-		//log.Println(msg)
-		_ = err
-		_ = msg
-		now2 := time.Now()
+		//time.Sleep(1 * time.Second)
+		time1 := time.Now()
 
-		fmt.Println(now2.Sub(now))
-		time.Sleep(time.Second)
+		msg := client.NewSendMessage("hello", nson.Message{"aaa": nson.String("bbb")}).WithCall(true)
+
+		log.Println(c.Send(msg, 0))
+
+		fmt.Println(time.Now().Sub(time1))
 	}
 
-	// var e = make(chan bool)
-	// <-e
+	var e = make(chan bool)
+	<-e
 }

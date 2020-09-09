@@ -18,7 +18,7 @@ import (
 
 type Config struct {
 	Addrs             []string
-	ClientId          nson.MessageId
+	SlotId            nson.MessageId
 	EnableCrypto      bool
 	CryptoMethod      crypto.Method
 	AccessKey         string
@@ -39,8 +39,8 @@ func (cfg *Config) init() {
 		cfg.Addrs = []string{"127.0.0.1:8888"}
 	}
 
-	if cfg.ClientId == nil {
-		cfg.ClientId = nson.NewMessageId()
+	if cfg.SlotId == nil {
+		cfg.SlotId = nson.NewMessageId()
 	}
 
 	if cfg.AuthMessage == nil {
@@ -48,6 +48,7 @@ func (cfg *Config) init() {
 	}
 
 	cfg.AuthMessage.Insert(CHAN, nson.String(AUTH))
+	cfg.AuthMessage.Insert(SLOT_ID, cfg.SlotId)
 
 	if cfg.EnableCrypto {
 		if cfg.CryptoMethod == crypto.None || cfg.AccessKey == "" || cfg.SecretKey == "" {
@@ -288,14 +289,16 @@ func (c *Conn) heartbeat() {
 			c.trace("heartbeat exit")
 			return
 		case <-time.After(c.config.HeartbeatInterval):
-			message := nson.Message{
-				CHAN: nson.String(PING),
-			}
-
-			c.SendMessage(message)
-
 			d := time.Now().Sub(c.LastRecvTime())
 			c.trace("heartbeat: %v", d)
+
+			if d > c.config.HeartbeatInterval {
+				message := nson.Message{
+					CHAN: nson.String(PING),
+				}
+
+				c.SendMessage(message)
+			}
 
 			if d > c.config.HeartbeatTimeout {
 				c.TryReconn()
@@ -494,20 +497,6 @@ func (c *Conn) SendMessage(msg nson.Message) (err error) {
 		c.writeMutex.Unlock()
 	}()
 
-	// base := c.base
-
-	// err = c._write(base, msg)
-	// if err == nil {
-	// 	c.writeCount += 1
-	// 	return
-	// }
-	// base.Close()
-
-	// go c.tryReconn(base)
-
-	// if c.waitReconn('w', c.writeWaitChan) {
-	// 	err = nil
-	// }
 	for {
 		if atomic.LoadInt32(&c.closed) != 0 {
 			return errors.New("conn closed")

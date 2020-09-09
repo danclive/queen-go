@@ -17,37 +17,23 @@ const (
 	connected
 )
 
-const CALL_ID = "_CALLID"
-const CALL = "CALL"
-const LLAC = "LLAC"
+const CALL_ID = "_call"
 
 type Client struct {
 	status uint32
 	conn   *conn.Conn
 
-	opMutex sync.Mutex
-	sending map[string]*BaseToken
-	calling map[string]*CallToken
-	recvs   map[string]recv
-	llacs   map[string]llac
-}
+	opMutex  sync.Mutex
+	sending  map[string]*Token
+	recvChan chan *RecvMessage
 
-type recv struct {
-	label    []string
-	callback func(nson.Message)
-}
-
-type llac struct {
-	label    []string
-	callback func(nson.Message) nson.Message
+	onConnectCallback func()
 }
 
 func NewClient(config conn.Config) (*Client, error) {
 	client := &Client{
-		sending: make(map[string]*BaseToken),
-		calling: make(map[string]*CallToken),
-		recvs:   make(map[string]recv),
-		llacs:   make(map[string]llac),
+		sending:  make(map[string]*Token),
+		recvChan: make(chan *RecvMessage, 64),
 	}
 
 	config.OnConnect = func() {
@@ -72,6 +58,20 @@ func NewClient(config conn.Config) (*Client, error) {
 
 func (c *Client) onConnect() {
 	atomic.StoreUint32(&c.status, uint32(connected))
+
+	c.opMutex.Lock()
+	callback := c.onConnectCallback
+	c.opMutex.Unlock()
+
+	if callback != nil {
+		callback()
+	}
+}
+
+func (c *Client) OnConnect(callback func()) {
+	c.opMutex.Lock()
+	c.onConnectCallback = callback
+	c.opMutex.Unlock()
 }
 
 func (c *Client) onDisConnect() {
@@ -81,15 +81,6 @@ func (c *Client) onDisConnect() {
 func (c *Client) IsConnect() bool {
 	status := atomic.LoadUint32(&c.status)
 	if status == connected {
-		return true
-	}
-
-	return false
-}
-
-func (c *Client) IsDisConnect() bool {
-	status := atomic.LoadUint32(&c.status)
-	if status == disconnected {
 		return true
 	}
 
@@ -108,11 +99,9 @@ func (c *Client) recv() {
 			return
 		}
 
-		// fmt.Println(msg.String())
-
 		if ch, err := msg.GetString(conn.CHAN); err == nil {
 			if code, err := msg.GetI32(conn.CODE); err == nil {
-				if id, err := msg.GetMessageId(conn.ID); err == nil {
+				if id, err := msg.GetMessageId(CALL_ID); err == nil {
 					c.opMutex.Lock()
 					sendToken, ok := c.sending[id.Hex()]
 					if ok {
@@ -122,119 +111,41 @@ func (c *Client) recv() {
 
 					if ok {
 						if code == 0 {
-							sendToken.flowComplete()
+							sendToken.setMessage(msg)
 						} else {
 							sendToken.setError(fmt.Errorf("error code: %v", code))
 						}
 
 						continue
 					}
-				} else if callId, err := msg.GetMessageId(CALL_ID); err == nil {
-					c.opMutex.Lock()
-					callToken, ok := c.calling[callId.Hex()]
-					if ok {
-						delete(c.calling, callId.Hex())
-					}
-					c.opMutex.Unlock()
-
-					if ok {
-						if code != 0 {
-							callToken.setError(fmt.Errorf("error code: %v", code))
-						}
-
-						continue
-					}
-				}
-			}
-
-			if ch == LLAC {
-				if callId, err := msg.GetMessageId(CALL_ID); err == nil {
-					c.opMutex.Lock()
-					if callToken, ok := c.calling[callId.Hex()]; ok {
-						delete(c.calling, callId.Hex())
-						callToken.setMessage(msg)
-					}
-					c.opMutex.Unlock()
 				}
 			} else {
-				c.opMutex.Lock()
-				if recv, ok := c.recvs[ch]; ok {
-					go recv.callback(msg)
-				} else if llac, ok := c.llacs[ch]; ok {
-					go func() {
-						if from, err := msg.GetMessageId(conn.FROM); err == nil {
-							if callId, err := msg.GetMessageId(CALL_ID); err == nil {
-								res_msg := llac.callback(msg)
-
-								res_msg.Insert(conn.CHAN, nson.String(LLAC))
-								res_msg.Insert(conn.TO, from)
-								res_msg.Insert(CALL_ID, callId)
-
-								c.conn.SendMessage(res_msg)
-							}
-						}
-					}()
-				}
-
-				c.opMutex.Unlock()
+				c.recvChan <- &RecvMessage{ch, msg}
 			}
+
 		} else {
 			log.Printf("message format error: %s", msg.String())
 		}
 	}
 }
 
-func (c *Client) Send(
-	ch string,
-	message nson.Message,
-	label []string,
-	to []nson.MessageId,
-	timeout time.Duration,
-) error {
-	if ch == "" {
-		return errors.New("消息频道不能为空")
-	}
-
-	if message == nil {
-		return errors.New("消息不能为 nil")
-	}
-
-	// 消息ID
-	id, err := message.GetMessageId(conn.ID)
-	if err != nil {
-		id = nson.NewMessageId()
-
-		message.Insert(conn.ID, id)
-	}
-
-	// CHAN
-	message.Insert(conn.CHAN, nson.String(ch))
-
-	// LABEL
-	if label != nil && len(label) > 0 {
-		array := make(nson.Array, 0)
-		for _, v := range label {
-			array = append(array, nson.String(v))
-		}
-		message.Insert(conn.LABEL, nson.Array(array))
-	}
-
-	// TO
-	if to != nil && len(to) > 0 {
-		array := make(nson.Array, 0)
-		for _, v := range to {
-			array = append(array, nson.String(v))
-		}
-		message.Insert(conn.TO, nson.Array(array))
+func (c *Client) RawSend(msg nson.Message, timeout time.Duration) (nson.Message, error) {
+	if msg == nil {
+		return nil, errors.New("消息不能为 nil")
 	}
 
 	if timeout == time.Duration(0) {
-		return c.conn.SendMessage(message)
+		timeout = time.Second * 10
 	}
 
-	// message.Insert(conn.ACK, nson.Bool(true))
+	id, err := msg.GetMessageId(CALL_ID)
+	if err != nil {
+		id = nson.NewMessageId()
 
-	token := newBaseToken()
+		msg.Insert(CALL_ID, id)
+	}
+
+	token := newToken()
 	c.opMutex.Lock()
 	c.sending[id.Hex()] = token
 	c.opMutex.Unlock()
@@ -248,28 +159,37 @@ func (c *Client) Send(
 		c.opMutex.Unlock()
 	}()
 
-	err = c.conn.SendMessage(message)
+	err = c.conn.SendMessage(msg)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if !token.WaitTimeout(timeout) {
-		return errors.New("timeout")
+		return nil, errors.New("timeout")
 	}
 
-	return token.Error()
+	return token.Message(), token.Error()
 }
 
-func (c *Client) detach(ch string) error {
+func (c *Client) Detach(ch string, label []string, timeout time.Duration) error {
 	msg := nson.Message{
 		conn.CHAN:  nson.String(conn.DETACH),
 		conn.VALUE: nson.String(ch),
 	}
 
-	return c.conn.SendMessage(msg)
+	if label != nil && len(label) > 0 {
+		array := make(nson.Array, 0)
+		for _, v := range label {
+			array = append(array, nson.String(v))
+		}
+		msg.Insert(conn.LABEL, nson.Array(array))
+	}
+
+	_, err := c.RawSend(msg, timeout)
+	return err
 }
 
-func (c *Client) attach(ch string, label []string) error {
+func (c *Client) Attach(ch string, label []string, timeout time.Duration) error {
 	msg := nson.Message{
 		conn.CHAN:  nson.String(conn.ATTACH),
 		conn.VALUE: nson.String(ch),
@@ -283,173 +203,24 @@ func (c *Client) attach(ch string, label []string) error {
 		msg.Insert(conn.LABEL, nson.Array(array))
 	}
 
-	return c.conn.SendMessage(msg)
+	_, err := c.RawSend(msg, timeout)
+	return err
 }
 
-func (c *Client) Recv(
-	ch string,
-	label []string,
-	callback func(nson.Message),
-) error {
-	if ch == "" {
-		return errors.New("消息频道不能为空")
-	}
-
-	err := c.RemoveRecv(ch)
-	if err != nil {
-		return err
-	}
-
-	c.opMutex.Lock()
-	c.recvs[ch] = recv{
-		label:    label,
-		callback: callback,
-	}
-	c.opMutex.Unlock()
-
-	return c.attach(ch, label)
-}
-
-func (c *Client) RemoveRecv(ch string) error {
-	if ch == "" {
-		return errors.New("消息频道不能为空")
-	}
-
-	c.opMutex.Lock()
-	_, ok := c.recvs[ch]
-	if ok {
-		delete(c.recvs, ch)
-	}
-	c.opMutex.Unlock()
-
-	if ok {
-		return c.detach(ch)
-	}
-
-	return nil
-}
-
-func (c *Client) Call(
-	ch string,
-	message nson.Message,
-	label []string,
-	to []nson.MessageId,
+func (c *Client) Send(
+	message *SendMessage,
 	timeout time.Duration,
 ) (nson.Message, error) {
-	if ch == "" {
-		return nil, errors.New("消息频道不能为空")
+
+	msg := message.Build()
+
+	if message.Call {
+		return c.RawSend(msg, timeout)
 	}
 
-	if message == nil {
-		return nil, errors.New("消息不能为 nil")
-	}
-
-	callId := nson.NewMessageId()
-
-	message.Insert(CALL_ID, callId)
-
-	// CHAN
-	ch2 := CALL + "." + ch
-	message.Insert(conn.CHAN, nson.String(ch2))
-
-	// LABEL
-	if label != nil && len(label) > 0 {
-		array := make(nson.Array, 0)
-		for _, v := range label {
-			array = append(array, nson.String(v))
-		}
-		message.Insert(conn.LABEL, nson.Array(array))
-	}
-
-	// TO
-	if to != nil && len(to) > 0 {
-		array := make(nson.Array, 0)
-		for _, v := range to {
-			array = append(array, nson.String(v))
-		}
-		message.Insert(conn.TO, nson.Array(array))
-	}
-
-	if timeout == time.Duration(0) {
-		timeout = time.Second * 60
-	}
-
-	// share
-	message.Insert(conn.SHARE, nson.Bool(true))
-
-	token := newCallToken()
-	c.opMutex.Lock()
-	c.calling[callId.Hex()] = token
-	c.opMutex.Unlock()
-	defer func() {
-		c.opMutex.Lock()
-		if token, ok := c.calling[callId.Hex()]; ok {
-			token.flowComplete()
-			delete(c.calling, callId.Hex())
-		}
-		c.opMutex.Unlock()
-	}()
-
-	err := c.conn.SendMessage(message)
-	if err != nil {
-		return nil, err
-	}
-
-	if !token.WaitTimeout(timeout) {
-		return nil, errors.New("timeout")
-	}
-
-	err = token.Error()
-	if err != nil {
-		return nil, err
-	}
-
-	return token.Message(), nil
+	return nil, c.conn.SendMessage(msg)
 }
 
-func (c *Client) Llac(
-	ch string,
-	label []string,
-	callback func(nson.Message) nson.Message,
-) error {
-	if ch == "" {
-		return errors.New("消息频道不能为空")
-	}
-
-	err := c.RemoveLlac(ch)
-	if err != nil {
-		return err
-	}
-
-	ch = CALL + "." + ch
-
-	c.opMutex.Lock()
-	c.llacs[ch] = llac{
-		label:    label,
-		callback: callback,
-	}
-	c.opMutex.Unlock()
-
-	return c.attach(ch, label)
-}
-
-func (c *Client) RemoveLlac(ch string) error {
-	if ch == "" {
-		return errors.New("消息频道不能为空")
-	}
-
-	ch = CALL + "." + ch
-
-	c.opMutex.Lock()
-	_, ok := c.llacs[ch]
-	if ok {
-		delete(c.llacs, ch)
-	}
-	c.opMutex.Unlock()
-
-	if ok {
-		return c.detach(ch)
-	}
-
-	return nil
+func (c *Client) Recv() <-chan *RecvMessage {
+	return c.recvChan
 }

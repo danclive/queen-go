@@ -1,10 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
-	"github.com/danclive/nson-go"
 	"github.com/danclive/queen-go/client"
 	"github.com/danclive/queen-go/conn"
 	"github.com/danclive/queen-go/crypto"
@@ -20,37 +18,30 @@ func main() {
 		Debug:        false,
 	}
 
-	client, err := client.NewClient(config)
+	c, err := client.NewClient(config)
 	if err != nil {
 		log.Fatalln(err)
 	}
-
-	_ = client
 
 	// go func() {
 	// 	time.Sleep(10 * time.Second)
 	// 	client.Close()
 	// }()
 
-	client.Recv("lala", nil, func(ch string, message nson.Message) {
-		fmt.Println(ch)
-		fmt.Println(message)
+	c.OnConnect(func() {
+		err = c.Attach("hello", nil, 0)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		for recv := range c.Recv() {
+			log.Println(recv)
+
+			if back, ok := recv.Back(); ok {
+				c.Send(back, 0)
+			}
+		}
 	})
-
-	client.Llac("lala", nil, func(ch string, message nson.Message) nson.Message {
-		fmt.Println(ch)
-		fmt.Println(message)
-
-		return message
-	})
-
-	i := 0
-	for {
-		i++
-		fmt.Println(i)
-		err = client.Send("lala", nson.Message{"aaa": nson.String("bbb")}, nil, nil, 0)
-		log.Println(err)
-	}
 
 	var e = make(chan bool)
 	<-e

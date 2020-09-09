@@ -53,39 +53,27 @@ func (b *baseToken) setError(e error) {
 	b.m.Unlock()
 }
 
-type BaseToken struct {
-	baseToken
-}
-
-func newBaseToken() *BaseToken {
-	return &BaseToken{
-		baseToken: baseToken{
-			complete: make(chan struct{}),
-		},
-	}
-}
-
-type CallToken struct {
+type Token struct {
 	baseToken
 	msg nson.Message
 }
 
-func newCallToken() *CallToken {
-	return &CallToken{
+func newToken() *Token {
+	return &Token{
 		baseToken: baseToken{
 			complete: make(chan struct{}),
 		},
 	}
 }
 
-func (c *CallToken) setMessage(msg nson.Message) {
+func (c *Token) setMessage(msg nson.Message) {
 	c.m.Lock()
 	c.msg = msg
 	c.flowComplete()
 	c.m.Unlock()
 }
 
-func (c *CallToken) Message() nson.Message {
+func (c *Token) Message() nson.Message {
 	c.m.Lock()
 	defer c.m.Unlock()
 	return c.msg
