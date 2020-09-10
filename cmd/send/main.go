@@ -32,16 +32,27 @@ func main() {
 	// }()
 
 	_ = c
-	for {
-		//time.Sleep(1 * time.Second)
-		time1 := time.Now()
+	// for {
+	//time.Sleep(1 * time.Second)
+	time1 := time.Now()
 
-		msg := client.NewSendMessage("hello", nson.Message{"aaa": nson.String("bbb")}).WithCall(true)
-
-		log.Println(c.Send(msg, 0))
-
-		fmt.Println(time.Now().Sub(time1))
+	slotId, err := nson.MessageIdFromHex("017477033867f215f0c5341e")
+	if err != nil {
+		panic(err)
 	}
+
+	msg := client.NewSendMessage("dev.meta").Call(true).To(slotId)
+
+	data := nson.Message{
+		"method": nson.String("PullSlots"),
+		"params": nson.Message{},
+	}
+	msg.Body().Insert("data", data)
+
+	log.Println(c.Send(msg, 0))
+
+	fmt.Println(time.Now().Sub(time1))
+	//}
 
 	var e = make(chan bool)
 	<-e

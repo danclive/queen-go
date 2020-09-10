@@ -29,8 +29,8 @@ type Config struct {
 	ReconnInterval    time.Duration
 	HeartbeatInterval time.Duration
 	HeartbeatTimeout  time.Duration
-	OnConnect         func()
-	OnDisConnect      func()
+	onConnect         func()
+	onDisConnect      func()
 	Debug             bool
 }
 
@@ -109,7 +109,10 @@ type Conn struct {
 	config Config
 }
 
-func Dial(config Config) (*Conn, error) {
+func Dial(config Config, onConnect func(), onDisConnect func()) (*Conn, error) {
+	config.onConnect = onConnect
+	config.onDisConnect = onDisConnect
+
 	config.init()
 
 	conn, err := dial(&config)
@@ -275,8 +278,8 @@ func (c *Conn) handshake() error {
 	c.lastRecvTime = time.Now()
 
 	// 运行到这里说明已经连接成功
-	if c.config.OnConnect != nil {
-		go c.config.OnConnect()
+	if c.config.onConnect != nil {
+		go c.config.onConnect()
 	}
 
 	return nil
@@ -483,6 +486,10 @@ func (c *Conn) _write(base net.Conn, msg nson.Message) error {
 }
 
 func (c *Conn) SendMessage(msg nson.Message) (err error) {
+	if msg == nil {
+		return errors.New("message cannot be nil")
+	}
+
 	c.trace("Write() %+v", msg)
 
 	c.trace("Write() wait write")
@@ -557,9 +564,9 @@ func (c *Conn) waitReconn(who byte, waitChan chan struct{}) (done bool) {
 
 func (c *Conn) tryReconn(badConn net.Conn) {
 	// 运行到这里说明已经断开连接
-	if c.config.OnDisConnect != nil {
+	if c.config.onDisConnect != nil {
 		// 调用回调函数
-		go c.config.OnDisConnect()
+		go c.config.onDisConnect()
 	}
 
 	var done bool

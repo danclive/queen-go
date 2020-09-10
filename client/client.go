@@ -36,15 +36,7 @@ func NewClient(config conn.Config) (*Client, error) {
 		recvChan: make(chan *RecvMessage, 64),
 	}
 
-	config.OnConnect = func() {
-		client.onConnect()
-	}
-
-	config.OnDisConnect = func() {
-		client.onDisConnect()
-	}
-
-	bc, err := conn.Dial(config)
+	bc, err := conn.Dial(config, client.onConnect, client.onDisConnect)
 	if err != nil {
 		return nil, err
 	}
@@ -111,9 +103,10 @@ func (c *Client) recv() {
 
 					if ok {
 						if code == 0 {
-							sendToken.setMessage(msg)
+							sendToken.setMessage(msg, nil)
 						} else {
-							sendToken.setError(fmt.Errorf("error code: %v", code))
+							// sendToken.setError(fmt.Errorf("error code: %v", code))
+							sendToken.setMessage(msg, fmt.Errorf("error code: %v", code))
 						}
 
 						continue
@@ -131,7 +124,7 @@ func (c *Client) recv() {
 
 func (c *Client) RawSend(msg nson.Message, timeout time.Duration) (nson.Message, error) {
 	if msg == nil {
-		return nil, errors.New("消息不能为 nil")
+		return nil, errors.New("message cannot be nil")
 	}
 
 	if timeout == time.Duration(0) {
@@ -211,10 +204,17 @@ func (c *Client) Send(
 	message *SendMessage,
 	timeout time.Duration,
 ) (nson.Message, error) {
+	if message == nil {
+		return nil, errors.New("message cannot be nil")
+	}
 
-	msg := message.Build()
+	if !c.IsConnect() {
+		return nil, errors.New("disconnected")
+	}
 
-	if message.Call {
+	msg := message.build()
+
+	if message.IsCall() {
 		return c.RawSend(msg, timeout)
 	}
 

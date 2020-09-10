@@ -66,9 +66,10 @@ func newToken() *Token {
 	}
 }
 
-func (c *Token) setMessage(msg nson.Message) {
+func (c *Token) setMessage(msg nson.Message, e error) {
 	c.m.Lock()
 	c.msg = msg
+	c.err = e
 	c.flowComplete()
 	c.m.Unlock()
 }

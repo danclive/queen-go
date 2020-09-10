@@ -29,20 +29,22 @@ func main() {
 	// }()
 
 	c.OnConnect(func() {
-		err = c.Attach("hello", nil, 0)
+		err = c.Attach("dev.data", nil, 0)
 		if err != nil {
 			log.Fatalln(err)
 		}
-
-		for recv := range c.Recv() {
-			log.Println(recv)
-
-			if back, ok := recv.Back(); ok {
-				c.Send(back, 0)
-			}
-		}
 	})
 
-	var e = make(chan bool)
-	<-e
+	recvChan := c.Recv()
+
+	for recv := range recvChan {
+		log.Println(recv)
+
+		if back := recv.Back(); back != nil {
+			c.Send(back, 0)
+		}
+	}
+
+	// var e = make(chan bool)
+	// <-e
 }

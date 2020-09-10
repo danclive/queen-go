@@ -6,63 +6,101 @@ import (
 )
 
 type SendMessage struct {
-	Ch    string
-	Body  nson.Message
-	Id    *nson.MessageId
-	Label []string
-	To    []nson.MessageId
-	Call  bool
+	ch    string
+	body  nson.Message
+	id    *nson.MessageId
+	label []string
+	to    []nson.MessageId
+	call  bool
 }
 
-func NewSendMessage(ch string, body nson.Message) *SendMessage {
+func NewSendMessage(ch string) *SendMessage {
 	return &SendMessage{
-		Ch:   ch,
-		Body: body,
+		ch:   ch,
+		body: nson.Message{},
 	}
 }
 
-func (s *SendMessage) WithId(id nson.MessageId) *SendMessage {
-	s.Id = &id
+func (s *SendMessage) Id(id nson.MessageId) *SendMessage {
+	s.id = &id
 	return s
 }
 
-func (s *SendMessage) WithLabel(label []string) *SendMessage {
-	s.Label = label
+func (s *SendMessage) GetId() *nson.MessageId {
+	return s.id
+}
+
+func (s *SendMessage) Label(label string) *SendMessage {
+	if s.label == nil {
+		s.label = make([]string, 0)
+	}
+
+	s.label = append(s.label, label)
+
 	return s
 }
 
-func (s *SendMessage) WithTo(to []nson.MessageId) *SendMessage {
-	s.To = to
+func (s *SendMessage) GetLable() []string {
+	return s.label
+}
+
+func (s *SendMessage) To(to nson.MessageId) *SendMessage {
+	if s.to == nil {
+		s.to = make([]nson.MessageId, 0)
+	}
+
+	s.to = append(s.to, to)
+
 	return s
 }
 
-func (s *SendMessage) WithCall(call bool) *SendMessage {
-	s.Call = call
+func (s *SendMessage) GetTo() []nson.MessageId {
+	return s.to
+}
+
+func (s *SendMessage) Call(call bool) *SendMessage {
+	s.call = call
 	return s
 }
 
-func (s *SendMessage) Build() nson.Message {
-	msg := s.Body
+func (s *SendMessage) IsCall() bool {
+	return s.call
+}
 
-	msg.Insert(conn.CHAN, nson.String(s.Ch))
+func (s *SendMessage) Body() *nson.Message {
+	return &s.body
+}
 
-	if s.Label != nil && len(s.Label) > 0 {
-		array := make(nson.Array, 0)
-		for _, v := range s.Label {
-			array = append(array, nson.String(v))
+func (s *SendMessage) build() nson.Message {
+	msg := s.body
+
+	msg.Insert(conn.CHAN, nson.String(s.ch))
+
+	if s.label != nil && len(s.label) > 0 {
+		if len(s.label) == 1 {
+			msg.Insert(conn.LABEL, nson.String(s.label[0]))
+		} else {
+			array := make(nson.Array, 0)
+			for _, v := range s.label {
+				array = append(array, nson.String(v))
+			}
+			msg.Insert(conn.LABEL, nson.Array(array))
 		}
-		msg.Insert(conn.LABEL, nson.Array(array))
 	}
 
-	if s.To != nil && len(s.To) > 0 {
-		array := make(nson.Array, 0)
-		for _, v := range s.To {
-			array = append(array, v)
+	if s.to != nil && len(s.to) > 0 {
+		if len(s.to) == 1 {
+			msg.Insert(conn.TO, s.to[0])
+		} else {
+			array := make(nson.Array, 0)
+			for _, v := range s.to {
+				array = append(array, v)
+			}
+			msg.Insert(conn.TO, nson.Array(array))
 		}
-		msg.Insert(conn.TO, nson.Array(array))
 	}
 
-	if s.Call {
+	if s.call {
 		msg.Insert(conn.SHARE, nson.Bool(true))
 	}
 
@@ -74,7 +112,7 @@ type RecvMessage struct {
 	Body nson.Message
 }
 
-func (r *RecvMessage) CallId() (nson.MessageId, bool) {
+func (r *RecvMessage) GetCallId() (nson.MessageId, bool) {
 	if id, err := r.Body.GetMessageId(CALL_ID); err == nil {
 		return id, true
 	}
@@ -82,7 +120,7 @@ func (r *RecvMessage) CallId() (nson.MessageId, bool) {
 	return nil, false
 }
 
-func (r *RecvMessage) FromId() (nson.MessageId, bool) {
+func (r *RecvMessage) GetFromId() (nson.MessageId, bool) {
 	if id, err := r.Body.GetMessageId(conn.FROM); err == nil {
 		return id, true
 	}
@@ -90,23 +128,23 @@ func (r *RecvMessage) FromId() (nson.MessageId, bool) {
 	return nil, false
 }
 
-func (r *RecvMessage) Back() (*SendMessage, bool) {
-	callId, ok := r.CallId()
+func (r *RecvMessage) Back() *SendMessage {
+	callId, ok := r.GetCallId()
 	if !ok {
-		return nil, false
+		return nil
 	}
 
-	fromId, ok := r.FromId()
+	fromId, ok := r.GetFromId()
 	if !ok {
-		return nil, false
+		return nil
 	}
 
 	return &SendMessage{
-		Ch: r.Ch,
-		Body: nson.Message{
+		ch: r.Ch,
+		body: nson.Message{
 			CALL_ID:   callId,
 			conn.CODE: nson.I32(0),
 		},
-		To: []nson.MessageId{fromId},
-	}, true
+		to: []nson.MessageId{fromId},
+	}
 }
