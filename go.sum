@@ -1,6 +1,8 @@
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/danclive/nson-go v0.3.0 h1:skVgeJrbJsQk3HpVOAtZ71QMi+VQuhttgUVsDDMBDAE=
 github.com/danclive/nson-go v0.3.0/go.mod h1:L1kLvlMsYMooindbfOBMV33U0S0chCfPyC5g2dimKAQ=
+github.com/danclive/nson-go v0.3.1 h1:ZNPol1IVmf9UWwgvUxEWCzvZ+yGkADZlFJVkghZCfgI=
+github.com/danclive/nson-go v0.3.1/go.mod h1:L1kLvlMsYMooindbfOBMV33U0S0chCfPyC5g2dimKAQ=
 github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

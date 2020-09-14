@@ -2,7 +2,7 @@ package client
 
 import (
 	"github.com/danclive/nson-go"
-	"github.com/danclive/queen-go/conn"
+	"github.com/danclive/queen-go/dict"
 )
 
 type SendMessage struct {
@@ -74,34 +74,34 @@ func (s *SendMessage) Body() *nson.Message {
 func (s *SendMessage) build() nson.Message {
 	msg := s.body
 
-	msg.Insert(conn.CHAN, nson.String(s.ch))
+	msg.Insert(dict.CHAN, nson.String(s.ch))
 
 	if s.label != nil && len(s.label) > 0 {
 		if len(s.label) == 1 {
-			msg.Insert(conn.LABEL, nson.String(s.label[0]))
+			msg.Insert(dict.LABEL, nson.String(s.label[0]))
 		} else {
 			array := make(nson.Array, 0)
 			for _, v := range s.label {
 				array = append(array, nson.String(v))
 			}
-			msg.Insert(conn.LABEL, nson.Array(array))
+			msg.Insert(dict.LABEL, nson.Array(array))
 		}
 	}
 
 	if s.to != nil && len(s.to) > 0 {
 		if len(s.to) == 1 {
-			msg.Insert(conn.TO, s.to[0])
+			msg.Insert(dict.TO, s.to[0])
 		} else {
 			array := make(nson.Array, 0)
 			for _, v := range s.to {
 				array = append(array, v)
 			}
-			msg.Insert(conn.TO, nson.Array(array))
+			msg.Insert(dict.TO, nson.Array(array))
 		}
 	}
 
 	if s.call {
-		msg.Insert(conn.SHARE, nson.Bool(true))
+		msg.Insert(dict.SHARE, nson.Bool(true))
 	}
 
 	return msg
@@ -121,7 +121,7 @@ func (r *RecvMessage) GetCallId() (nson.MessageId, bool) {
 }
 
 func (r *RecvMessage) GetFromId() (nson.MessageId, bool) {
-	if id, err := r.Body.GetMessageId(conn.FROM); err == nil {
+	if id, err := r.Body.GetMessageId(dict.FROM); err == nil {
 		return id, true
 	}
 
@@ -143,7 +143,7 @@ func (r *RecvMessage) Back() *SendMessage {
 		ch: r.Ch,
 		body: nson.Message{
 			CALL_ID:   callId,
-			conn.CODE: nson.I32(0),
+			dict.CODE: nson.I32(0),
 		},
 		to: []nson.MessageId{fromId},
 	}

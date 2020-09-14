@@ -25,11 +25,11 @@ const (
 func (m Method) ToString() string {
 	switch m {
 	case Aes128Gcm:
-		return "AES_128_GCM"
+		return "A1G"
 	case Aes256Gcm:
-		return "AES_256_GCM"
+		return "A2G"
 	case ChaCha20Poly1305:
-		return "CHACHA20_POLY1305"
+		return "CP1"
 	}
 
 	return ""

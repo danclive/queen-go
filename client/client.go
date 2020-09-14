@@ -10,6 +10,7 @@ import (
 
 	"github.com/danclive/nson-go"
 	"github.com/danclive/queen-go/conn"
+	"github.com/danclive/queen-go/dict"
 )
 
 const (
@@ -91,8 +92,8 @@ func (c *Client) recv() {
 			return
 		}
 
-		if ch, err := msg.GetString(conn.CHAN); err == nil {
-			if code, err := msg.GetI32(conn.CODE); err == nil {
+		if ch, err := msg.GetString(dict.CHAN); err == nil {
+			if code, err := msg.GetI32(dict.CODE); err == nil {
 				if id, err := msg.GetMessageId(CALL_ID); err == nil {
 					c.opMutex.Lock()
 					sendToken, ok := c.sending[id.Hex()]
@@ -166,8 +167,8 @@ func (c *Client) RawSend(msg nson.Message, timeout time.Duration) (nson.Message,
 
 func (c *Client) Detach(ch string, label []string, timeout time.Duration) error {
 	msg := nson.Message{
-		conn.CHAN:  nson.String(conn.DETACH),
-		conn.VALUE: nson.String(ch),
+		dict.CHAN:  nson.String(dict.DETACH),
+		dict.VALUE: nson.String(ch),
 	}
 
 	if label != nil && len(label) > 0 {
@@ -175,7 +176,7 @@ func (c *Client) Detach(ch string, label []string, timeout time.Duration) error 
 		for _, v := range label {
 			array = append(array, nson.String(v))
 		}
-		msg.Insert(conn.LABEL, nson.Array(array))
+		msg.Insert(dict.LABEL, nson.Array(array))
 	}
 
 	_, err := c.RawSend(msg, timeout)
@@ -184,8 +185,8 @@ func (c *Client) Detach(ch string, label []string, timeout time.Duration) error 
 
 func (c *Client) Attach(ch string, label []string, timeout time.Duration) error {
 	msg := nson.Message{
-		conn.CHAN:  nson.String(conn.ATTACH),
-		conn.VALUE: nson.String(ch),
+		dict.CHAN:  nson.String(dict.ATTACH),
+		dict.VALUE: nson.String(ch),
 	}
 
 	if label != nil && len(label) > 0 {
@@ -193,7 +194,7 @@ func (c *Client) Attach(ch string, label []string, timeout time.Duration) error 
 		for _, v := range label {
 			array = append(array, nson.String(v))
 		}
-		msg.Insert(conn.LABEL, nson.Array(array))
+		msg.Insert(dict.LABEL, nson.Array(array))
 	}
 
 	_, err := c.RawSend(msg, timeout)

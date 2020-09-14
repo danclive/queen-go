@@ -13,6 +13,7 @@ import (
 
 	"github.com/danclive/nson-go"
 	"github.com/danclive/queen-go/crypto"
+	"github.com/danclive/queen-go/dict"
 	"github.com/danclive/queen-go/util"
 )
 
@@ -47,8 +48,8 @@ func (cfg *Config) init() {
 		cfg.AuthMessage = nson.Message{}
 	}
 
-	cfg.AuthMessage.Insert(CHAN, nson.String(AUTH))
-	cfg.AuthMessage.Insert(SLOT_ID, cfg.SlotId)
+	cfg.AuthMessage.Insert(dict.CHAN, nson.String(dict.AUTH))
+	cfg.AuthMessage.Insert(dict.SLOT_ID, cfg.SlotId)
 
 	if cfg.EnableCrypto {
 		if cfg.CryptoMethod == crypto.None || cfg.AccessKey == "" || cfg.SecretKey == "" {
@@ -65,15 +66,15 @@ func (cfg *Config) init() {
 	}
 
 	if cfg.ReconnInterval == time.Duration(0) {
-		cfg.ReconnInterval = time.Second * 5
+		cfg.ReconnInterval = time.Second * 10
 	}
 
 	if cfg.HeartbeatInterval == time.Duration(0) {
-		cfg.HeartbeatInterval = time.Second * 5
+		cfg.HeartbeatInterval = time.Second * 10
 	}
 
 	if cfg.HeartbeatTimeout == time.Duration(0) {
-		cfg.HeartbeatTimeout = cfg.HeartbeatInterval * 5
+		cfg.HeartbeatTimeout = cfg.HeartbeatInterval * 10
 	}
 }
 
@@ -189,12 +190,12 @@ func (c *Conn) init_crypto() error {
 func (c *Conn) handshake() error {
 	// 构建握手消息
 	message := nson.Message{
-		CHAN: nson.String(HAND),
+		dict.CHAN: nson.String(dict.HAND),
 	}
 
 	if c.config.EnableCrypto {
-		message.Insert(METHOD, nson.String(c.config.CryptoMethod.ToString()))
-		message.Insert(ACCESS, nson.String(c.config.AccessKey))
+		message.Insert(dict.METHOD, nson.String(c.config.CryptoMethod.ToString()))
+		message.Insert(dict.ACCESS, nson.String(c.config.AccessKey))
 	}
 
 	// 编码并发送
@@ -216,7 +217,7 @@ func (c *Conn) handshake() error {
 	}
 
 	len := int(util.GetI32(lbuf[:], 0))
-	if len < 5 || len > MAX_MESSAGE_LEN {
+	if len < 5 || len > dict.MAX_MESSAGE_LEN {
 		return fmt.Errorf("消息长度不合适: %v", len)
 	}
 
@@ -242,7 +243,7 @@ func (c *Conn) handshake() error {
 
 	message2 := value.(nson.Message)
 
-	code, err := message2.GetI32(CODE)
+	code, err := message2.GetI32(dict.CODE)
 	if err != nil {
 		return err
 	}
@@ -264,7 +265,7 @@ func (c *Conn) handshake() error {
 		return err
 	}
 
-	code, err = rmsg.GetI32(CODE)
+	code, err = rmsg.GetI32(dict.CODE)
 	if err != nil {
 		return err
 	}
@@ -297,7 +298,7 @@ func (c *Conn) heartbeat() {
 
 			if d > c.config.HeartbeatInterval {
 				message := nson.Message{
-					CHAN: nson.String(PING),
+					dict.CHAN: nson.String(dict.PING),
 				}
 
 				c.SendMessage(message)
@@ -380,7 +381,7 @@ func (c *Conn) _read(base net.Conn) (nson.Message, error) {
 	}
 
 	len := int(util.GetI32(lbuf[:], 0))
-	if len < 5 || len > MAX_MESSAGE_LEN {
+	if len < 5 || len > dict.MAX_MESSAGE_LEN {
 		return nil, fmt.Errorf("消息长度不合适: %v", len)
 	}
 
