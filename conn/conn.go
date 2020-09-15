@@ -53,7 +53,7 @@ func (cfg *Config) init() {
 
 	if cfg.EnableCrypto {
 		if cfg.CryptoMethod == crypto.None || cfg.AccessKey == "" || cfg.SecretKey == "" {
-			log.Fatalln("如果开启了加密，必须提供 CryptoMethod， AccessKey 和 SecretKey")
+			log.Fatalln("if enable crypto, must provide CryptoMethod， AccessKey and SecretKey")
 		}
 	}
 
@@ -153,11 +153,6 @@ func dial(config *Config) (net.Conn, error) {
 		}
 	}
 
-	// if conn != nil {
-	// 	conn.(*net.TCPConn).SetKeepAlive(true)
-	// 	conn.(*net.TCPConn).SetKeepAlivePeriod(config.KeepAlivePeriod)
-	// }
-
 	return conn, err
 }
 
@@ -218,7 +213,7 @@ func (c *Conn) handshake() error {
 
 	len := int(util.GetI32(lbuf[:], 0))
 	if len < 5 || len > dict.MAX_MESSAGE_LEN {
-		return fmt.Errorf("消息长度不合适: %v", len)
+		return errors.New("invalid data")
 	}
 
 	rbuf := make([]byte, len)
@@ -238,7 +233,7 @@ func (c *Conn) handshake() error {
 	}
 
 	if value.Tag() != nson.TAG_MESSAGE {
-		return errors.New("错误的消息格式")
+		return errors.New("invalid data")
 	}
 
 	message2 := value.(nson.Message)
@@ -382,7 +377,7 @@ func (c *Conn) _read(base net.Conn) (nson.Message, error) {
 
 	len := int(util.GetI32(lbuf[:], 0))
 	if len < 5 || len > dict.MAX_MESSAGE_LEN {
-		return nil, fmt.Errorf("消息长度不合适: %v", len)
+		return nil, errors.New("invalid data")
 	}
 
 	rbuf := make([]byte, len)
@@ -409,7 +404,7 @@ func (c *Conn) _read(base net.Conn) (nson.Message, error) {
 	}
 
 	if value.Tag() != nson.TAG_MESSAGE {
-		return nil, errors.New("错误的消息格式")
+		return nil, errors.New("invalid data")
 	}
 
 	return value.(nson.Message), nil
