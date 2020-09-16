@@ -1,12 +1,12 @@
 package crypto
 
 import (
-	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
 	"errors"
+	"fmt"
 	"io"
 
 	"github.com/danclive/queen-go/util"
@@ -93,17 +93,13 @@ func (aead *Aead) Encrypt(in []byte) ([]byte, error) {
 
 	cipherdata := aead.inner.Seal(nil, nonce, in[4:], nil)
 
-	buf := new(bytes.Buffer)
+	bytes := util.UInt32ToBytes(uint32(4 + len(cipherdata) + 12))
+	bytes = append(bytes, cipherdata...)
+	bytes = append(bytes, nonce...)
 
-	err = util.WriteInt32(buf, int32(4+len(cipherdata)+12))
-	if err != nil {
-		panic(err)
-	}
+	fmt.Println(bytes)
 
-	buf.Write(cipherdata)
-	buf.Write(nonce)
-
-	return buf.Bytes(), nil
+	return bytes, nil
 }
 
 func (aead *Aead) Decrypt(in []byte) ([]byte, error) {
@@ -118,16 +114,10 @@ func (aead *Aead) Decrypt(in []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	buf := new(bytes.Buffer)
+	bytes := util.UInt32ToBytes(uint32(len(plaindata) + 4))
+	bytes = append(bytes, plaindata...)
 
-	err = util.WriteInt32(buf, int32(len(plaindata)+4))
-	if err != nil {
-		return nil, err
-	}
-
-	buf.Write(plaindata)
-
-	return buf.Bytes(), nil
+	return bytes, nil
 }
 
 func randNonce() ([]byte, error) {
@@ -139,13 +129,13 @@ func randNonce() ([]byte, error) {
 	return nonce, nil
 }
 
-func increaseNonce(nonce []byte) {
-	for i, v := range nonce {
-		if v == 255 {
-			nonce[i] = 0
-		} else {
-			nonce[i] += 1
-			return
-		}
-	}
-}
+// func increaseNonce(nonce []byte) {
+// 	for i, v := range nonce {
+// 		if v == 255 {
+// 			nonce[i] = 0
+// 		} else {
+// 			nonce[i] += 1
+// 			return
+// 		}
+// 	}
+// }

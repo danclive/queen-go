@@ -211,7 +211,7 @@ func (c *Conn) handshake() error {
 		return err
 	}
 
-	len := int(util.GetI32(lbuf[:], 0))
+	len := int(util.GetU32(lbuf[:], 0))
 	if len < 5 || len > dict.MAX_MESSAGE_LEN {
 		return errors.New("invalid data")
 	}
@@ -375,7 +375,7 @@ func (c *Conn) _read(base net.Conn) (nson.Message, error) {
 		return nil, err
 	}
 
-	len := int(util.GetI32(lbuf[:], 0))
+	len := int(util.GetU32(lbuf[:], 0))
 	if len < 5 || len > dict.MAX_MESSAGE_LEN {
 		return nil, errors.New("invalid data")
 	}
