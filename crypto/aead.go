@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"errors"
-	"fmt"
 	"io"
 
 	"github.com/danclive/queen-go/util"
@@ -96,8 +95,6 @@ func (aead *Aead) Encrypt(in []byte) ([]byte, error) {
 	bytes := util.UInt32ToBytes(uint32(4 + len(cipherdata) + 12))
 	bytes = append(bytes, cipherdata...)
 	bytes = append(bytes, nonce...)
-
-	fmt.Println(bytes)
 
 	return bytes, nil
 }

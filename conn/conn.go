@@ -22,8 +22,8 @@ type Config struct {
 	SlotId            nson.MessageId
 	EnableCrypto      bool
 	CryptoMethod      crypto.Method
-	AccessKey         string
 	SecretKey         string
+	HandMessage       nson.Message
 	AuthMessage       nson.Message
 	HandshakeTimeout  time.Duration
 	ReconnWaitTimeout time.Duration
@@ -52,8 +52,8 @@ func (cfg *Config) init() {
 	cfg.AuthMessage.Insert(dict.SLOT_ID, cfg.SlotId)
 
 	if cfg.EnableCrypto {
-		if cfg.CryptoMethod == crypto.None || cfg.AccessKey == "" || cfg.SecretKey == "" {
-			log.Fatalln("if enable crypto, must provide CryptoMethod， AccessKey and SecretKey")
+		if cfg.CryptoMethod == crypto.None || cfg.SecretKey == "" {
+			log.Fatalln("if enable crypto, must provide CryptoMethod, SecretKey")
 		}
 	}
 
@@ -190,8 +190,9 @@ func (c *Conn) handshake() error {
 
 	if c.config.EnableCrypto {
 		message.Insert(dict.METHOD, nson.String(c.config.CryptoMethod.ToString()))
-		message.Insert(dict.ACCESS, nson.String(c.config.AccessKey))
 	}
+
+	message.Extend(c.config.HandMessage)
 
 	// 编码并发送
 	buf := new(bytes.Buffer)
