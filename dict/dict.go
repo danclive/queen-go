@@ -6,7 +6,6 @@ const CHAN = "_ch"
 
 // channel
 const CHANS = "_cs"
-const AUTH = "_au"
 const ATTACH = "_ah"
 const DETACH = "_dh"
 const PING = "_pi"

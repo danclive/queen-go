@@ -19,12 +19,12 @@ import (
 
 type Config struct {
 	Addrs             []string
-	SlotId            nson.MessageId
 	EnableCrypto      bool
 	CryptoMethod      crypto.Method
 	SecretKey         string
+	SlotId            nson.MessageId
+	Root              bool
 	HandMessage       nson.Message
-	AuthMessage       nson.Message
 	HandshakeTimeout  time.Duration
 	ReconnWaitTimeout time.Duration
 	ReconnInterval    time.Duration
@@ -44,12 +44,12 @@ func (cfg *Config) init() {
 		cfg.SlotId = nson.NewMessageId()
 	}
 
-	if cfg.AuthMessage == nil {
-		cfg.AuthMessage = nson.Message{}
+	if cfg.HandMessage == nil {
+		cfg.HandMessage = nson.Message{}
 	}
 
-	cfg.AuthMessage.Insert(dict.CHAN, nson.String(dict.AUTH))
-	cfg.AuthMessage.Insert(dict.SLOT_ID, cfg.SlotId)
+	cfg.HandMessage.Insert(dict.SLOT_ID, cfg.SlotId)
+	cfg.HandMessage.Insert(dict.ROOT, nson.Bool(cfg.Root))
 
 	if cfg.EnableCrypto {
 		if cfg.CryptoMethod == crypto.None || cfg.SecretKey == "" {
@@ -250,8 +250,12 @@ func (c *Conn) handshake() error {
 
 	// 握手成功
 
-	// 认证
-	err = c._write(c.base, c.config.AuthMessage)
+	// ping
+	ping_message := nson.Message{
+		dict.CHAN: nson.String(dict.PING),
+	}
+
+	err = c._write(c.base, ping_message)
 	if err != nil {
 		return err
 	}
@@ -269,8 +273,6 @@ func (c *Conn) handshake() error {
 	if code != 0 {
 		return fmt.Errorf("error code %v", code)
 	}
-
-	// 认证成功
 
 	c.lastRecvTime = time.Now()
 
