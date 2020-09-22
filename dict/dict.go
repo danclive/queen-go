@@ -5,7 +5,6 @@ const MAX_MESSAGE_LEN = 64 * 1024 * 1024
 const CHAN = "_ch"
 
 // channel
-const CHANS = "_cs"
 const ATTACH = "_ah"
 const DETACH = "_dh"
 const PING = "_pi"
@@ -25,6 +24,8 @@ const SHARE = "_sh"
 const ROOT = "_ro"
 const ATTR = "_at"
 const ADDR = "_ad"
+const CHANS = "_cs"
+const SHARE_CHANS = "_sc"
 
 // message id
 const ID = "_id"

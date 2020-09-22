@@ -165,7 +165,7 @@ func (c *Client) RawSend(msg nson.Message, timeout time.Duration) (nson.Message,
 	return token.Message(), token.Error()
 }
 
-func (c *Client) Detach(ch string, label []string, timeout time.Duration) error {
+func (c *Client) Detach(ch string, label []string, share bool) error {
 	msg := nson.Message{
 		dict.CHAN:  nson.String(dict.DETACH),
 		dict.VALUE: nson.String(ch),
@@ -179,11 +179,15 @@ func (c *Client) Detach(ch string, label []string, timeout time.Duration) error 
 		msg.Insert(dict.LABEL, nson.Array(array))
 	}
 
-	_, err := c.RawSend(msg, timeout)
+	if share {
+		msg.Insert(dict.SHARE, nson.Bool(true))
+	}
+
+	_, err := c.RawSend(msg, 0)
 	return err
 }
 
-func (c *Client) Attach(ch string, label []string, timeout time.Duration) error {
+func (c *Client) Attach(ch string, label []string, share bool) error {
 	msg := nson.Message{
 		dict.CHAN:  nson.String(dict.ATTACH),
 		dict.VALUE: nson.String(ch),
@@ -197,7 +201,11 @@ func (c *Client) Attach(ch string, label []string, timeout time.Duration) error 
 		msg.Insert(dict.LABEL, nson.Array(array))
 	}
 
-	_, err := c.RawSend(msg, timeout)
+	if share {
+		msg.Insert(dict.SHARE, nson.Bool(true))
+	}
+
+	_, err := c.RawSend(msg, 0)
 	return err
 }
 
