@@ -34,11 +34,12 @@ func (m Method) ToString() string {
 	return ""
 }
 
-type Aead struct {
-	inner cipher.AEAD
+type Crypto struct {
+	aead   cipher.AEAD
+	method Method
 }
 
-func NewAead(method Method, key string) (*Aead, error) {
+func NewCrypto(method Method, key string) (*Crypto, error) {
 	h := sha256.New()
 	h.Write([]byte(key))
 	aead_key := h.Sum(nil)
@@ -55,7 +56,7 @@ func NewAead(method Method, key string) (*Aead, error) {
 			return nil, err
 		}
 
-		return &Aead{inner: aesgcm}, nil
+		return &Crypto{aesgcm, method}, nil
 	case Aes256Gcm:
 		block, err := aes.NewCipher(aead_key)
 		if err != nil {
@@ -67,20 +68,24 @@ func NewAead(method Method, key string) (*Aead, error) {
 			return nil, err
 		}
 
-		return &Aead{inner: aesgcm}, nil
+		return &Crypto{aesgcm, method}, nil
 	case ChaCha20Poly1305:
 		aesgcm, err := chacha20poly1305.New(aead_key)
 		if err != nil {
 			return nil, err
 		}
 
-		return &Aead{inner: aesgcm}, nil
+		return &Crypto{aesgcm, method}, nil
 	}
 
 	return nil, errors.New("unsupport")
 }
 
-func (aead *Aead) Encrypt(in []byte) ([]byte, error) {
+func (c *Crypto) Method() Method {
+	return c.method
+}
+
+func (c *Crypto) Encrypt(in []byte) ([]byte, error) {
 	if len(in) <= 4 {
 		return nil, errors.New("invalid in size")
 	}
@@ -90,7 +95,7 @@ func (aead *Aead) Encrypt(in []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	cipherdata := aead.inner.Seal(nil, nonce, in[4:], nil)
+	cipherdata := c.aead.Seal(nil, nonce, in[4:], nil)
 
 	bytes := util.UInt32ToBytes(uint32(4 + len(cipherdata) + 12))
 	bytes = append(bytes, cipherdata...)
@@ -99,14 +104,14 @@ func (aead *Aead) Encrypt(in []byte) ([]byte, error) {
 	return bytes, nil
 }
 
-func (aead *Aead) Decrypt(in []byte) ([]byte, error) {
+func (c *Crypto) Decrypt(in []byte) ([]byte, error) {
 	if len(in) <= 4+16+12 {
 		return nil, errors.New("invalid in size")
 	}
 
 	nonce := in[len(in)-12:]
 
-	plaindata, err := aead.inner.Open(nil, nonce, in[4:len(in)-12], nil)
+	plaindata, err := c.aead.Open(nil, nonce, in[4:len(in)-12], nil)
 	if err != nil {
 		return nil, err
 	}

@@ -54,6 +54,7 @@ const CHACHA20_POLY1305 = "CP1"
 
 // network
 const HAND = "_ha"
+const KEEP_ALIVE = "_ke"
 const METHOD = "_me"
 const SECURE = "_se"
 const ORIGIN = "_or"
