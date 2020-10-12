@@ -41,7 +41,7 @@ type Options struct {
 	SecretKey         string
 	SlotId            nson.MessageId
 	Root              bool
-	HandMessage       nson.Message
+	Attr              nson.Message
 	HandTimeout       uint32
 	KeepAlive         uint32
 	HeartbeatInterval uint32
@@ -57,12 +57,12 @@ func NewClient(o Options) (*Client, error) {
 		o.SlotId = nson.NewMessageId()
 	}
 
-	if o.HandMessage == nil {
-		o.HandMessage = nson.Message{}
+	if o.Attr == nil {
+		o.Attr = nson.Message{}
 	}
 
-	o.HandMessage.Insert(dict.SLOT_ID, o.SlotId)
-	o.HandMessage.Insert(dict.ROOT, nson.Bool(o.Root))
+	o.Attr.Insert(dict.SLOT_ID, o.SlotId)
+	o.Attr.Insert(dict.ROOT, nson.Bool(o.Root))
 
 	if o.HandTimeout == 0 {
 		o.HandTimeout = 10
@@ -141,7 +141,7 @@ func (c *Client) Connect(callback func(*Client)) {
 							wire, err := NewWire(
 								c.options.Addrs,
 								c.crypto,
-								c.options.HandMessage,
+								c.options.Attr,
 								c.options.HandTimeout,
 								c.options.KeepAlive,
 								c.options.HeartbeatInterval,
@@ -308,7 +308,7 @@ func (c *Client) Send(
 
 	msg := message.build()
 
-	if message.IsCall() {
+	if message.Call() {
 		return c.RawSend(msg, timeout)
 	}
 

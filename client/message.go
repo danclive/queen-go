@@ -21,49 +21,43 @@ func NewSendMessage(ch string) *SendMessage {
 	}
 }
 
-func (s *SendMessage) Id(id nson.MessageId) *SendMessage {
+func (s *SendMessage) SetId(id nson.MessageId) {
 	s.id = &id
-	return s
 }
 
-func (s *SendMessage) GetId() *nson.MessageId {
+func (s *SendMessage) Id() *nson.MessageId {
 	return s.id
 }
 
-func (s *SendMessage) Label(label string) *SendMessage {
+func (s *SendMessage) AddLabel(label string) {
 	if s.label == nil {
 		s.label = make([]string, 0)
 	}
 
 	s.label = append(s.label, label)
-
-	return s
 }
 
-func (s *SendMessage) GetLable() []string {
+func (s *SendMessage) Lable() []string {
 	return s.label
 }
 
-func (s *SendMessage) To(to nson.MessageId) *SendMessage {
+func (s *SendMessage) AddTo(to nson.MessageId) {
 	if s.to == nil {
 		s.to = make([]nson.MessageId, 0)
 	}
 
 	s.to = append(s.to, to)
-
-	return s
 }
 
-func (s *SendMessage) GetTo() []nson.MessageId {
+func (s *SendMessage) To() []nson.MessageId {
 	return s.to
 }
 
-func (s *SendMessage) Call(call bool) *SendMessage {
+func (s *SendMessage) SetCall(call bool) {
 	s.call = call
-	return s
 }
 
-func (s *SendMessage) IsCall() bool {
+func (s *SendMessage) Call() bool {
 	return s.call
 }
 

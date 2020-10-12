@@ -3,10 +3,10 @@ package crypto
 import (
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/rand"
 	"crypto/sha256"
 	"errors"
-	"io"
+
+	"github.com/danclive/nson-go"
 
 	"github.com/danclive/queen-go/util"
 	"golang.org/x/crypto/chacha20poly1305"
@@ -90,16 +90,13 @@ func (c *Crypto) Encrypt(in []byte) ([]byte, error) {
 		return nil, errors.New("invalid in size")
 	}
 
-	nonce, err := randNonce()
-	if err != nil {
-		return nil, err
-	}
+	nonc := nonce()
 
-	cipherdata := c.aead.Seal(nil, nonce, in[4:], nil)
+	cipherdata := c.aead.Seal(nil, nonc, in[4:], nil)
 
 	bytes := util.UInt32ToBytes(uint32(4 + len(cipherdata) + 12))
 	bytes = append(bytes, cipherdata...)
-	bytes = append(bytes, nonce...)
+	bytes = append(bytes, nonc...)
 
 	return bytes, nil
 }
@@ -122,14 +119,18 @@ func (c *Crypto) Decrypt(in []byte) ([]byte, error) {
 	return bytes, nil
 }
 
-func randNonce() ([]byte, error) {
-	nonce := make([]byte, 12)
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return nil, err
-	}
-
-	return nonce, nil
+func nonce() []byte {
+	return []byte(nson.NewMessageId())
 }
+
+// func randNonce() ([]byte, error) {
+// 	nonce := make([]byte, 12)
+// 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+// 		return nil, err
+// 	}
+
+// 	return nonce, nil
+// }
 
 // func increaseNonce(nonce []byte) {
 // 	for i, v := range nonce {

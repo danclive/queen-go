@@ -33,7 +33,7 @@ type Wire struct {
 	// config
 	addrs             []string
 	crypto            *crypto.Crypto
-	handMessage       nson.Message
+	attr              nson.Message
 	handTimeout       uint32
 	keepAlive         uint32
 	heartbeatInterval uint32
@@ -45,7 +45,7 @@ type Wire struct {
 func NewWire(
 	addrs []string,
 	crypto *crypto.Crypto,
-	handMessage nson.Message,
+	attr nson.Message,
 	handTimeout uint32,
 	keepAlive uint32,
 	heartbeatInterval uint32,
@@ -84,7 +84,7 @@ func NewWire(
 		error:             make(chan error, 1),
 		addrs:             addrs,
 		crypto:            crypto,
-		handMessage:       handMessage,
+		attr:              attr,
 		handTimeout:       handTimeout,
 		keepAlive:         keepAlive,
 		heartbeatInterval: heartbeatInterval,
@@ -128,7 +128,7 @@ func (w *Wire) Connect() error {
 		msg.Insert(dict.METHOD, nson.String(w.crypto.Method().ToString()))
 	}
 
-	msg.Extend(w.handMessage)
+	msg.Extend(w.attr)
 
 	buf := new(bytes.Buffer)
 	err = msg.Encode(buf)
