@@ -73,7 +73,7 @@ func NewClient(o Options) (*Client, error) {
 	}
 
 	if o.HeartbeatInterval == 0 {
-		o.HeartbeatInterval = 5
+		o.HeartbeatInterval = 10
 	}
 
 	if o.Logger == nil {
@@ -87,6 +87,10 @@ func NewClient(o Options) (*Client, error) {
 	}
 
 	if o.EnableCrypto {
+		if o.CryptoMethod == crypto.None {
+			o.CryptoMethod = crypto.ChaCha20Poly1305
+		}
+
 		crypto, err := crypto.NewCrypto(o.CryptoMethod, o.SecretKey)
 		if err != nil {
 			return nil, err
@@ -154,14 +158,14 @@ func (c *Client) Connect(callback func(*Client)) {
 								return
 							}
 
-							c.options.Logger.Debug("connect ...")
+							c.options.Logger.Info("connect", zap.String("addrs", fmt.Sprintf("%s", c.options.Addrs)))
 							err = wire.Connect()
 							if err != nil {
 								c.options.Logger.Error(err.Error())
 								return
 							}
 
-							c.options.Logger.Debug("connect success")
+							c.options.Logger.Info("connect success", zap.String("addr", fmt.Sprintf("%s", wire.conn.RemoteAddr())))
 
 							c.wire = wire
 						}()
@@ -191,7 +195,9 @@ func (c *Client) Connect(callback func(*Client)) {
 							f2 := c.onDisConnect
 							c.opLock.RUnlock()
 
-							f2()
+							if f2 != nil {
+								f2()
+							}
 						}
 					}
 
@@ -330,7 +336,7 @@ func (c *Client) Close() {
 		return
 	default:
 		close(c.close)
-		c.DisConnect()
+		go c.DisConnect()
 	}
 }
 

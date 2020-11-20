@@ -78,7 +78,7 @@ func NewCrypto(method Method, key string) (*Crypto, error) {
 		return &Crypto{aesgcm, method}, nil
 	}
 
-	return nil, errors.New("unsupport")
+	return nil, errors.New("unsupport crypto method")
 }
 
 func (c *Crypto) Method() Method {
