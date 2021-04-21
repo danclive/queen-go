@@ -6,12 +6,12 @@ import (
 )
 
 type SendMessage struct {
-	ch    string
-	body  nson.Message
-	id    *nson.MessageId
-	label []string
-	to    []nson.MessageId
-	call  bool
+	ch   string
+	body nson.Message
+	id   *nson.MessageId
+	tag  []string
+	to   []nson.MessageId
+	call bool
 }
 
 func NewSendMessage(ch string) *SendMessage {
@@ -29,16 +29,16 @@ func (s *SendMessage) Id() *nson.MessageId {
 	return s.id
 }
 
-func (s *SendMessage) AddLabel(label string) {
-	if s.label == nil {
-		s.label = make([]string, 0)
+func (s *SendMessage) AddTag(tag string) {
+	if s.tag == nil {
+		s.tag = make([]string, 0)
 	}
 
-	s.label = append(s.label, label)
+	s.tag = append(s.tag, tag)
 }
 
 func (s *SendMessage) Lable() []string {
-	return s.label
+	return s.tag
 }
 
 func (s *SendMessage) AddTo(to nson.MessageId) {
@@ -70,15 +70,15 @@ func (s *SendMessage) build() nson.Message {
 
 	msg.Insert(dict.CHAN, nson.String(s.ch))
 
-	if s.label != nil && len(s.label) > 0 {
-		if len(s.label) == 1 {
-			msg.Insert(dict.LABEL, nson.String(s.label[0]))
+	if s.tag != nil && len(s.tag) > 0 {
+		if len(s.tag) == 1 {
+			msg.Insert(dict.TAG, nson.String(s.tag[0]))
 		} else {
 			array := make(nson.Array, 0)
-			for _, v := range s.label {
+			for _, v := range s.tag {
 				array = append(array, nson.String(v))
 			}
-			msg.Insert(dict.LABEL, nson.Array(array))
+			msg.Insert(dict.TAG, nson.Array(array))
 		}
 	}
 

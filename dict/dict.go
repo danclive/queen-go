@@ -4,9 +4,13 @@ const MAX_MESSAGE_LEN = 64 * 1024 * 1024
 
 const CHAN = "_ch"
 
-// channel
+// system channel
 const ATTACH = "_ah"
 const DETACH = "_dh"
+const BIND = "_bi"
+const UNBIND = "_ub"
+const JOIN = "_jo"
+const UNJOIN = "_uj"
 const PING = "_pi"
 const QUERY = "_qu"
 const MINE = "_mi"
@@ -17,15 +21,20 @@ const CTRL = "_ct"
 const SOCKET_ID = "_so"
 const SLOT_ID = "_sl"
 const VALUE = "_va"
-const LABEL = "_la"
+const TAG = "_ta"
 const TO = "_to"
+const TO_SOCKET = "_ts"
 const FROM = "_fr"
+const FROM_SOCKET = "_fs"
 const SHARE = "_sh"
 const ROOT = "_ro"
 const ATTR = "_at"
 const ADDR = "_ad"
 const CHANS = "_cs"
 const SHARE_CHANS = "_sc"
+const BINDED = "_bd"
+const BOUNDED = "_bo"
+const JOINED = "_jd"
 
 // message id
 const ID = "_id"
@@ -43,6 +52,10 @@ const SLOT_KILL = "_slki"
 const SLOT_SEND = "_slse"
 const SLOT_RECV = "_slrc"
 
+// bind event channel
+const BIND_SEND = "_bdse"
+const BIND_RECV = "_bdre"
+
 // attr
 const SEND_NUM = "_snum"
 const RECV_NUM = "_rnum"
@@ -55,6 +68,7 @@ const CHACHA20_POLY1305 = "CP1"
 // network
 const HAND = "_ha"
 const KEEP_ALIVE = "_ke"
+
 const METHOD = "_me"
 const SECURE = "_se"
 const ORIGIN = "_or"

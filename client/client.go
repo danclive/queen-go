@@ -260,18 +260,18 @@ func (c *Client) RawSend(msg nson.Message, timeout time.Duration) (nson.Message,
 	return token.Message(), token.Error()
 }
 
-func (c *Client) Detach(ch string, label []string, share bool) error {
+func (c *Client) Detach(ch string, tag []string, share bool) error {
 	msg := nson.Message{
 		dict.CHAN:  nson.String(dict.DETACH),
 		dict.VALUE: nson.String(ch),
 	}
 
-	if label != nil && len(label) > 0 {
+	if tag != nil && len(tag) > 0 {
 		array := make(nson.Array, 0)
-		for _, v := range label {
+		for _, v := range tag {
 			array = append(array, nson.String(v))
 		}
-		msg.Insert(dict.LABEL, nson.Array(array))
+		msg.Insert(dict.TAG, nson.Array(array))
 	}
 
 	if share {
@@ -282,18 +282,18 @@ func (c *Client) Detach(ch string, label []string, share bool) error {
 	return err
 }
 
-func (c *Client) Attach(ch string, label []string, share bool) error {
+func (c *Client) Attach(ch string, tag []string, share bool) error {
 	msg := nson.Message{
 		dict.CHAN:  nson.String(dict.ATTACH),
 		dict.VALUE: nson.String(ch),
 	}
 
-	if label != nil && len(label) > 0 {
+	if tag != nil && len(tag) > 0 {
 		array := make(nson.Array, 0)
-		for _, v := range label {
+		for _, v := range tag {
 			array = append(array, nson.String(v))
 		}
-		msg.Insert(dict.LABEL, nson.Array(array))
+		msg.Insert(dict.TAG, nson.Array(array))
 	}
 
 	if share {
