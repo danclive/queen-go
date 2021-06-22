@@ -29,14 +29,6 @@ func (s *SendMessage) Id() *nson.MessageId {
 	return s.id
 }
 
-func (s *SendMessage) AddTag(tag string) {
-	if s.tag == nil {
-		s.tag = make([]string, 0)
-	}
-
-	s.tag = append(s.tag, tag)
-}
-
 func (s *SendMessage) Lable() []string {
 	return s.tag
 }
@@ -69,18 +61,6 @@ func (s *SendMessage) build() nson.Message {
 	msg := s.body
 
 	msg.Insert(dict.CHAN, nson.String(s.ch))
-
-	if s.tag != nil && len(s.tag) > 0 {
-		if len(s.tag) == 1 {
-			msg.Insert(dict.TAG, nson.String(s.tag[0]))
-		} else {
-			array := make(nson.Array, 0)
-			for _, v := range s.tag {
-				array = append(array, nson.String(v))
-			}
-			msg.Insert(dict.TAG, nson.Array(array))
-		}
-	}
 
 	if s.to != nil && len(s.to) > 0 {
 		if len(s.to) == 1 {
