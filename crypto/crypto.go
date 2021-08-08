@@ -90,15 +90,18 @@ func (c *Crypto) Encrypt(in []byte) ([]byte, error) {
 		return nil, errors.New("invalid in size")
 	}
 
-	nonc := nonce()
+	nonce := nonce()
 
-	cipherdata := c.aead.Seal(nil, nonc, in[4:], nil)
+	cipherdata := c.aead.Seal(in[:4], nonce, in[4:], nil)
 
-	bytes := util.UInt32ToBytes(uint32(4 + len(cipherdata) + 12))
-	bytes = append(bytes, cipherdata...)
-	bytes = append(bytes, nonc...)
+	cipherdata = append(cipherdata, nonce...)
 
-	return bytes, nil
+	b := util.UInt32ToBytes(uint32(len(cipherdata)))
+	for i := 0; i < len(b); i++ {
+		cipherdata[i] = b[i]
+	}
+
+	return cipherdata, nil
 }
 
 func (c *Crypto) Decrypt(in []byte) ([]byte, error) {
@@ -108,16 +111,38 @@ func (c *Crypto) Decrypt(in []byte) ([]byte, error) {
 
 	nonce := in[len(in)-12:]
 
-	plaindata, err := c.aead.Open(nil, nonce, in[4:len(in)-12], nil)
+	plaindata, err := c.aead.Open(in[:4], nonce, in[4:len(in)-12], nil)
 	if err != nil {
 		return nil, err
 	}
 
-	bytes := util.UInt32ToBytes(uint32(len(plaindata) + 4))
-	bytes = append(bytes, plaindata...)
+	b := util.UInt32ToBytes(uint32(len(plaindata)))
+	for i := 0; i < len(b); i++ {
+		plaindata[i] = b[i]
+	}
 
-	return bytes, nil
+	return plaindata, nil
 }
+
+// func (c *Crypto) Open(dst, in []byte) ([]byte, error) {
+// 	if len(in) <= 16+12 {
+// 		return nil, errors.New("invalid in size")
+// 	}
+
+// 	nonce := in[len(in)-12:]
+
+// 	plaindata, err := c.aead.Open(dst, nonce, in[:len(in)-12], nil)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	b := util.UInt32ToBytes(uint32(len(plaindata)))
+// 	for i := 0; i < len(b); i++ {
+// 		plaindata[i] = b[i]
+// 	}
+
+// 	return plaindata, nil
+// }
 
 func nonce() []byte {
 	return []byte(nson.NewMessageId())

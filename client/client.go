@@ -3,22 +3,37 @@ package client
 import (
 	"errors"
 	"fmt"
+	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/danclive/nson-go"
+	"github.com/danclive/queen-go/circ"
 	"github.com/danclive/queen-go/crypto"
 	"github.com/danclive/queen-go/dict"
+	"github.com/danclive/queen-go/wire"
 	"go.uber.org/zap"
 )
 
-const CALL_ID = "_call"
+const (
+	CALL_ID = "_call"
+)
+
+var (
+	BufferSize = 1024 * 1024 * 8 // the size of the buffer in bytes.
+	BlockSize  = 1024 * 8        // the size per R/W block in bytes.
+
+	ErrClientClosed     = errors.New("Client not open")
+	ErrClientDisConnect = errors.New("Client not connect")
+)
 
 type Client struct {
 	options Options
 
 	onConnect    func(*Client)
-	onDisConnect func()
+	onDisConnect func(*Client)
 	onRecv       func(*Client, RecvMessage)
 	opLock       sync.RWMutex
 	connectOnce  sync.Once
@@ -26,26 +41,31 @@ type Client struct {
 	sending  map[string]*Token
 	sendLock sync.Mutex
 
-	wire     *Wire
+	wire     *wire.Wire
 	wireLock sync.RWMutex
 
 	crypto *crypto.Crypto
 
+	State State // the operational state of the client.
 	close chan struct{}
 }
 
 type Options struct {
-	Addrs             []string
-	EnableCrypto      bool
-	CryptoMethod      crypto.Method
-	SecretKey         string
-	SlotId            nson.MessageId
-	Root              bool
-	Attr              nson.Message
-	HandTimeout       uint32
-	KeepAlive         uint32
-	HeartbeatInterval uint32
-	Logger            *zap.Logger
+	Addrs        []string
+	EnableCrypto bool
+	CryptoMethod crypto.Method
+	SecretKey    string
+	SlotId       nson.MessageId
+	Root         bool
+	Attr         nson.Message
+	KeepAlive    uint32
+	Logger       *zap.Logger
+}
+
+// State tracks the state of the Wire.
+type State struct {
+	Done    int32     // atomic counter which indicates that the wire has closed.
+	endOnce sync.Once // only end once.
 }
 
 func NewClient(o Options) (*Client, error) {
@@ -64,16 +84,8 @@ func NewClient(o Options) (*Client, error) {
 	o.Attr.Insert(dict.SLOT_ID, o.SlotId)
 	o.Attr.Insert(dict.ROOT, nson.Bool(o.Root))
 
-	if o.HandTimeout == 0 {
-		o.HandTimeout = 10
-	}
-
 	if o.KeepAlive == 0 {
-		o.KeepAlive = 60
-	}
-
-	if o.HeartbeatInterval == 0 {
-		o.HeartbeatInterval = 10
+		o.KeepAlive = 30
 	}
 
 	if o.Logger == nil {
@@ -109,112 +121,115 @@ func (c *Client) IsConnect() bool {
 	return c.wire != nil
 }
 
-func (c *Client) DisConnect() {
-	c.wireLock.Lock()
-	defer c.wireLock.Unlock()
-
-	if c.wire != nil {
-		c.wire.Close()
-		c.wire = nil
-	}
-}
-
-func (c *Client) OnDisConnect(callback func()) {
+func (c *Client) OnDisConnect(callback func(*Client)) {
 	c.opLock.Lock()
 	c.onDisConnect = callback
 	c.opLock.Unlock()
 }
 
-func (c *Client) Connect(callback func(*Client)) {
+func (c *Client) OnConnect(callback func(*Client)) {
 	c.opLock.Lock()
 	c.onConnect = callback
 	c.opLock.Unlock()
-
-	c.connectOnce.Do(func() {
-		go func() {
-			for {
-				select {
-				case <-c.close:
-					return
-				default:
-					if !c.IsConnect() {
-						func() {
-							c.wireLock.Lock()
-							defer c.wireLock.Unlock()
-
-							wire, err := NewWire(
-								c.options.Addrs,
-								c.crypto,
-								c.options.Attr,
-								c.options.HandTimeout,
-								c.options.KeepAlive,
-								c.options.HeartbeatInterval,
-								c.recv,
-								c.options.Logger,
-							)
-
-							if err != nil {
-								c.options.Logger.Error(err.Error())
-								return
-							}
-
-							c.options.Logger.Info("connect", zap.String("addrs", fmt.Sprintf("%s", c.options.Addrs)))
-							err = wire.Connect()
-							if err != nil {
-								c.options.Logger.Error(err.Error())
-								return
-							}
-
-							c.options.Logger.Info("connect success", zap.String("addr", fmt.Sprintf("%s", wire.conn.RemoteAddr())))
-
-							c.wire = wire
-						}()
-
-						c.wireLock.RLock()
-						wire := c.wire
-						c.wireLock.RUnlock()
-
-						if wire != nil {
-							c.opLock.RLock()
-							f := c.onConnect
-							c.opLock.RUnlock()
-
-							go f(c)
-
-							// when the connection is broken, this function will return
-							wire.Run()
-
-							c.options.Logger.Debug("disconnect")
-
-							c.wireLock.Lock()
-							c.wire = nil
-							c.wireLock.Unlock()
-
-							// call disconnect callback
-							c.opLock.RLock()
-							f2 := c.onDisConnect
-							c.opLock.RUnlock()
-
-							if f2 != nil {
-								f2()
-							}
-						}
-					}
-
-					time.Sleep(time.Duration(c.options.HeartbeatInterval) * time.Second)
-				}
-			}
-		}()
-	})
 }
 
-func (c *Client) Recv(callback func(*Client, RecvMessage)) {
+func (c *Client) OnRecv(callback func(*Client, RecvMessage)) {
 	c.opLock.Lock()
 	c.onRecv = callback
 	c.opLock.Unlock()
 }
 
-func (c *Client) RawSend(msg nson.Message, timeout time.Duration) (nson.Message, error) {
+func (c *Client) Connect() {
+	c.connectOnce.Do(func() {
+		for {
+			select {
+			case <-c.close:
+				return
+			default:
+				ticker := backoff.NewTicker(backoff.NewExponentialBackOff())
+
+				var conn net.Conn
+				var err error
+
+				for range ticker.C {
+					if conn, err = dial(c.options.Addrs); err != nil {
+						c.options.Logger.Error("dial error, will retry...", zap.Error(err))
+						continue
+					}
+
+					ticker.Stop()
+					break
+				}
+
+				w := wire.NewWire(conn, circ.NewReader(BufferSize, BlockSize), circ.NewWriter(BufferSize, BlockSize), c.options.SlotId, c.crypto, 0)
+
+				if err = w.Handshake(c.options.Attr); err != nil {
+					c.options.Logger.Error("handshake error, will retry...", zap.Error(err))
+					continue
+				}
+
+				ping := nson.Message{dict.CHAN: nson.String(dict.PING)}
+				if _, err = w.Write(ping); err != nil {
+					c.options.Logger.Error("ping error, will retry...", zap.Error(err))
+					continue
+				}
+
+				c.wireLock.Lock()
+				c.wire = w
+				c.wireLock.Unlock()
+
+				c.opLock.RLock()
+				onConnect := c.onConnect
+				c.opLock.RUnlock()
+
+				if onConnect != nil {
+					go onConnect(c)
+				}
+
+				err = w.Read(c.recv)
+				fmt.Println(err)
+
+				c.wireLock.Lock()
+				c.wire = nil
+				c.wireLock.Unlock()
+
+				if err != nil {
+					c.options.Logger.Error("read error, will retry...", zap.Error(err))
+				}
+
+				c.opLock.RLock()
+				onDisConnect := c.onDisConnect
+				c.opLock.RUnlock()
+
+				if onDisConnect != nil {
+					go onDisConnect(c)
+				}
+			}
+		}
+	})
+}
+
+func (c *Client) Stop() {
+	if atomic.LoadInt32(&c.State.Done) == 1 {
+		return
+	}
+
+	c.State.endOnce.Do(func() {
+		close(c.close)
+
+		c.wireLock.Lock()
+		c.wire.Stop()
+		c.wireLock.Unlock()
+
+		atomic.StoreInt32(&c.State.Done, 1)
+	})
+}
+
+func (c *Client) Call(msg nson.Message, timeout time.Duration) (nson.Message, error) {
+	if atomic.LoadInt32(&c.State.Done) == 1 {
+		return nil, ErrClientClosed
+	}
+
 	if msg == nil {
 		return nil, errors.New("message cannot be nil")
 	}
@@ -246,10 +261,10 @@ func (c *Client) RawSend(msg nson.Message, timeout time.Duration) (nson.Message,
 
 	c.wireLock.RLock()
 	if c.wire != nil {
-		c.wire.Send(msg)
+		c.wire.Write(msg)
 	} else {
 		c.wireLock.RUnlock()
-		return nil, errors.New("disconnected")
+		return nil, ErrClientDisConnect
 	}
 	c.wireLock.RUnlock()
 
@@ -270,7 +285,7 @@ func (c *Client) Detach(ch string, share bool) error {
 		msg.Insert(dict.SHARE, nson.Bool(true))
 	}
 
-	_, err := c.RawSend(msg, 0)
+	_, err := c.Call(msg, 0)
 	return err
 }
 
@@ -284,7 +299,7 @@ func (c *Client) Attach(ch string, share bool) error {
 		msg.Insert(dict.SHARE, nson.Bool(true))
 	}
 
-	_, err := c.RawSend(msg, 0)
+	_, err := c.Call(msg, 0)
 	return err
 }
 
@@ -292,6 +307,10 @@ func (c *Client) Send(
 	message *SendMessage,
 	timeout time.Duration,
 ) (nson.Message, error) {
+	if atomic.LoadInt32(&c.State.Done) == 1 {
+		return nil, ErrClientClosed
+	}
+
 	if message == nil {
 		return nil, errors.New("message cannot be nil")
 	}
@@ -299,32 +318,21 @@ func (c *Client) Send(
 	msg := message.build()
 
 	if message.Call() {
-		return c.RawSend(msg, timeout)
+		return c.Call(msg, timeout)
 	}
 
 	c.wireLock.RLock()
+	defer c.wireLock.RUnlock()
 	if c.wire != nil {
-		c.wire.Send(msg)
+		c.wire.Write(msg)
 	} else {
-		c.wireLock.RUnlock()
-		return nil, errors.New("disconnected")
+		return nil, ErrClientDisConnect
 	}
-	c.wireLock.RUnlock()
 
 	return nil, nil
 }
 
-func (c *Client) Close() {
-	select {
-	case <-c.close:
-		return
-	default:
-		close(c.close)
-		go c.DisConnect()
-	}
-}
-
-func (c *Client) recv(ch string, msg nson.Message) {
+func (c *Client) recv(_ *wire.Wire, ch string, msg nson.Message) error {
 	if code, err := msg.GetI32(dict.CODE); err == nil {
 		if id, err := msg.GetMessageId(CALL_ID); err == nil {
 			c.sendLock.Lock()
@@ -350,4 +358,19 @@ func (c *Client) recv(ch string, msg nson.Message) {
 			go callback(c, RecvMessage{ch, msg})
 		}
 	}
+
+	return nil
+}
+
+func dial(addrs []string) (net.Conn, error) {
+	var conn net.Conn
+	var err error
+	for _, addr := range addrs {
+		conn, err = net.DialTimeout("tcp", addr, time.Second*10)
+		if err == nil {
+			return conn, nil
+		}
+	}
+
+	return conn, err
 }
